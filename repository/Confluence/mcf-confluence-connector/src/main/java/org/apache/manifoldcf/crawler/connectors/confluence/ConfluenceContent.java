@@ -1,17 +1,12 @@
 package org.apache.manifoldcf.crawler.connectors.confluence;
 
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-
 import org.apache.manifoldcf.core.common.DateParser;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
+
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.*;
 
 /**
  * Zaizi (pvt) Ltd
@@ -20,8 +15,8 @@ import org.json.simple.JSONObject;
  */
 public class ConfluenceContent extends ConfluenceJSONResponse {
 
-	
-	private final static String KEY_LINKS = "_links";
+
+    private final static String KEY_LINKS = "_links";
 	private final static String KEY_ID = "content_id";
 	private final static String KEY_SELF = "self";
 	private final static String KEY_WEBUI = "webui";
@@ -51,8 +46,9 @@ public class ConfluenceContent extends ConfluenceJSONResponse {
 	private static final String KEY_MIME_TYPE = "mimeType";
 	private static final String KEY_SIZE = "size";
 	private static final String KEY_WHEN = "when";
+    public static final String SOLR_DATE_FORMAT = "yyyy-MM-dd'T'HH:mm:ss'Z'";
 
-	public ConfluenceContent() {
+    public ConfluenceContent() {
 		super();
 		// TODO Auto-generated constructor stub
 	}
@@ -237,12 +233,12 @@ public class ConfluenceContent extends ConfluenceJSONResponse {
 		rmap.put(KEY_AUTHOR, new String[]{getCreatedByUserName()});
 		
 		//createdDate
-		DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
+		DateFormat formatter = new SimpleDateFormat(SOLR_DATE_FORMAT);
 		String dateOut = formatter.format(getCreatedDate());		
 		rmap.put(KEY_CREATED_DATE, new String[]{dateOut});
 		
 		String modifiedDate = formatter.format(getLastModified());
-		rmap.put(KEY_LAST_MODIFIED_DATE, new String[]{modifiedDate});//not available assigned default
+		rmap.put(KEY_LAST_MODIFIED_DATE, new String[]{modifiedDate});
 		
 		//creator
 		rmap.put(KEY_CREATOR, new String[]{getCreatedByUserName()});//not available assigned default

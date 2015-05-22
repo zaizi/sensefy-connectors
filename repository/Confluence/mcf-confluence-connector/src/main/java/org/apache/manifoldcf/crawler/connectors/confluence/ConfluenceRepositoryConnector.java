@@ -1,39 +1,23 @@
 package org.apache.manifoldcf.crawler.connectors.confluence;
 
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InterruptedIOException;
-import java.nio.charset.StandardCharsets;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-
 import org.apache.commons.lang.StringUtils;
 import org.apache.manifoldcf.agents.interfaces.RepositoryDocument;
 import org.apache.manifoldcf.agents.interfaces.ServiceInterruption;
 import org.apache.manifoldcf.core.common.XThreadStringBuffer;
-import org.apache.manifoldcf.core.interfaces.ConfigParams;
-import org.apache.manifoldcf.core.interfaces.IHTTPOutput;
-import org.apache.manifoldcf.core.interfaces.IPasswordMapperActivity;
-import org.apache.manifoldcf.core.interfaces.IPostParameters;
-import org.apache.manifoldcf.core.interfaces.IThreadContext;
-import org.apache.manifoldcf.core.interfaces.ManifoldCFException;
-import org.apache.manifoldcf.core.interfaces.SpecificationNode;
+import org.apache.manifoldcf.core.interfaces.*;
 import org.apache.manifoldcf.crawler.connectors.BaseRepositoryConnector;
 import org.apache.manifoldcf.crawler.interfaces.DocumentSpecification;
 import org.apache.manifoldcf.crawler.interfaces.IProcessActivity;
 import org.apache.manifoldcf.crawler.interfaces.ISeedingActivity;
 import org.apache.manifoldcf.crawler.system.Logging;
+
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InterruptedIOException;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
+import java.util.Map.Entry;
 
 /**
  * Zaizi (pvt) Ltd
@@ -421,7 +405,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		//fillInProxyConfigurationMap(paramMap, out, parameters);
 
 		Messages.outputResourceWithVelocity(out, locale, VIEW_CONFIG_FORWARD,
-				paramMap);
+                paramMap);
 	}
 
 	@Override
@@ -441,7 +425,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 
 		// Output the Javascript - only one Velocity template for all tabs
 		Messages.outputResourceWithVelocity(out, locale,
-				EDIT_CONFIG_HEADER_FORWARD, paramMap);
+                EDIT_CONFIG_HEADER_FORWARD, paramMap);
 	}
 
 	@Override
@@ -579,7 +563,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		fillInConfSecuritySpecificationMap(paramMap, ds);
 
 		Messages.outputResourceWithVelocity(out, locale, VIEW_SPEC_FORWARD,
-				paramMap);
+                paramMap);
 	}
 
 	/* Handle job specification post
@@ -688,7 +672,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		
 		//no seed query is needed
 		//Messages.outputResourceWithVelocity(out, locale,EDIT_SPEC_FORWARD_CONFQUERY, paramMap);
-		Messages.outputResourceWithVelocity(out, locale,EDIT_SPEC_FORWARD_SECURITY, paramMap);
+		Messages.outputResourceWithVelocity(out, locale, EDIT_SPEC_FORWARD_SECURITY, paramMap);
 	}
 
 	/* 
@@ -710,7 +694,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		fillInConfSecuritySpecificationMap(paramMap, ds);
 
 		Messages.outputResourceWithVelocity(out, locale,
-				EDIT_SPEC_HEADER_FORWARD, paramMap);
+                EDIT_SPEC_HEADER_FORWARD, paramMap);
 	}
 
 	/* Adding seed documents
@@ -817,27 +801,9 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		              Logging.connectors.debug("Confluence: This content exists: " + confContent.getID());
 		            }
 
-		            // Unpack the version string
-		            ArrayList acls = new ArrayList();
-		            StringBuilder denyAclBuffer = new StringBuilder();
-		            int index = unpackList(acls,version,0,'+');
-		            if (index < version.length() && version.charAt(index++) == '+') {
-		              index = unpack(denyAclBuffer,version,index,'+');
-		            }
-
 		            //otherwise process
 		            RepositoryDocument rd = new RepositoryDocument();
-		              
-		            // Turn into acls and add into description
-		            String[] aclArray = new String[acls.size()];
-		            for (int j = 0; j < aclArray.length; j++) {
-		              aclArray[j] = (String)acls.get(j);
-		            }
-		            rd.setSecurityACL(RepositoryDocument.SECURITY_TYPE_DOCUMENT,aclArray);
-		            if (denyAclBuffer.length() > 0) {
-		              String[] denyAclArray = new String[]{denyAclBuffer.toString()};
-		              rd.setSecurityDenyACL(RepositoryDocument.SECURITY_TYPE_DOCUMENT,denyAclArray);
-		            }
+
 
 		            // Now do standard stuff
 		              
@@ -850,7 +816,8 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		              rd.setCreatedDate(createdDate);
 		            if (modifiedDate != null)
 		              rd.setModifiedDate(modifiedDate);
-		            
+
+                    rd.setIndexingDate(new Date());
 		            // Get general document metadata
 		            Map<String,String[]> metadataMap = confContent.getMetadata();
 		            Logging.connectors.info("meta data : " + metadataMap);
@@ -861,13 +828,8 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		            
 		            //add mime type
 		            rd.addField("mimeType", mimeType);
-		            
-		            //date added date          
-		    		
-		    		DateFormat formatter = new SimpleDateFormat("yyyy-MM-dd");
-		    		String dateOut = formatter.format(confContent.getCreatedDate());
-		            
-		            rd.addField("cdate", createdDate);
+
+
 		            //add author
 		            rd.addField("author", confContent.getCreatedByDisplayName());
 		            
@@ -892,10 +854,10 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		              } finally {
 		                is.close();
 		              }
-		            } catch (java.io.IOException e) {
+		            } catch (IOException e) {
 		              handleIOException(e);
 		            }
-					
+
 					////
 				}
 			} finally {
@@ -907,54 +869,35 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		}
 	}
 
+
+    /**
+     * This method returns the version of the current docs.
+     * The version will be calculated based on the last modified date.
+     * @param documentIdentifiers
+     * @param spec
+     * @return
+     * @throws org.apache.manifoldcf.core.interfaces.ManifoldCFException
+     * @throws org.apache.manifoldcf.agents.interfaces.ServiceInterruption
+     */
 	@Override
 	public String[] getDocumentVersions(String[] documentIdentifiers,
 			DocumentSpecification spec) throws ManifoldCFException,
 			ServiceInterruption {
-		
-		String[] acls = getAcls(spec);
-	    if (acls != null)
-	      java.util.Arrays.sort(acls);
-	    
 	    String[] rval = new String[documentIdentifiers.length];
 	    for (int i = 0; i < rval.length; i++) {
 	      String nodeId = documentIdentifiers[i];
-	      String contentId = nodeId;//nodeid is the contentid
-	        ConfluenceContent confluenceContent = getContent(contentId);
-	        Date rev = confluenceContent.getCreatedDate();
-	        if (rev != null) {
-	          StringBuilder sb = new StringBuilder();
-
-	          String[] aclsToUse;
-	          if (acls == null) {
-	            
-	        	  //no need to query the users
-	        	  aclsToUse = new String[0];  
-	          } else {
-	            aclsToUse = acls;
-	          }
-	          
-	          // Acls
-	          packList(sb,aclsToUse,'+');
-	          if (aclsToUse.length > 0) {
-	            sb.append('+');
-	            pack(sb,defaultAuthorityDenyToken,'+');
-	          } else
-	            sb.append('-');
-	          sb.append(rev.toString());
-	          rval[i] = sb.toString();
+	        ConfluenceContent confluenceContent = getContent(nodeId);
+	        Date lastModificationDate = confluenceContent.getLastModified();
+	        if (lastModificationDate != null) {
+	           rval[i]=Long.toString(lastModificationDate.getTime());
 	        } else {
-	          
 	          rval[i] = null;
 	        }
-	      
-	      
 	    }
 	    return rval;
-
 	}
 
-	
+
 	/**
 	 * Grab forced acl out of document specification. (wont be used now)
 	 * @param spec
@@ -985,8 +928,8 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 
 	/**
 	 * Check if connection with confluence is successful
-	 * @throws ManifoldCFException
-	 * @throws ServiceInterruption
+	 * @throws org.apache.manifoldcf.core.interfaces.ManifoldCFException
+	 * @throws org.apache.manifoldcf.agents.interfaces.ServiceInterruption
 	 */
 	protected void checkConnection() throws ManifoldCFException,
 			ServiceInterruption {
@@ -1051,7 +994,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		}
 
 		public void finishUp() throws InterruptedException, IOException,
-				ResponseException {
+                ResponseException {
 			join();
 			Throwable thr = exception;
 			if (thr != null) {
@@ -1100,7 +1043,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		}
 
 		public void finishUp() throws InterruptedException, IOException,
-				ResponseException {
+                ResponseException {
 			seedBuffer.abandon();
 			join();
 			Throwable thr = exception;
@@ -1170,7 +1113,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		}
 
 		public void finishUp() throws InterruptedException, IOException,
-				ResponseException {
+                ResponseException {
 			join();
 			Throwable thr = exception;
 			if (thr != null) {
@@ -1210,7 +1153,7 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 		}
 
 		public void finishUp() throws InterruptedException, IOException,
-				ResponseException {
+                ResponseException {
 			join();
 			Throwable thr = exception;
 			if (thr != null) {
@@ -1232,13 +1175,13 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 
 	}
 
-	
+
 	/**
 	 * (This wont be called), this will used in conjunction with permission and Authority repository implementation
 	 * @param contentId
 	 * @return
-	 * @throws ManifoldCFException
-	 * @throws ServiceInterruption
+	 * @throws org.apache.manifoldcf.core.interfaces.ManifoldCFException
+	 * @throws org.apache.manifoldcf.agents.interfaces.ServiceInterruption
 	 */
 	protected List<String> getUsers(String contentId)
 			throws ManifoldCFException, ServiceInterruption {
