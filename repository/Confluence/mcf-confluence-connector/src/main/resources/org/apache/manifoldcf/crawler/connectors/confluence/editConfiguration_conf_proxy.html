@@ -1,0 +1,61 @@
+#if($TabName == $ResourceBundle.getString('ConfRepositoryConnector.Proxy'))
+
+<table class="displaytable">
+  <tr><td class="separator" colspan="2"><hr/></td></tr>
+
+  <tr>
+    <td class="description">
+      <nobr>$Encoder.bodyEscape($ResourceBundle.getString('ConfRepositoryConnector.ConfProxyHostColon'))</nobr>
+    </td>
+    <td class="value">
+      <input size="32" type="text" id="confproxyhost" name="confproxyhost" value="$Encoder.attributeEscape($CONFPROXYHOST)" />
+    </td>
+  </tr>
+
+  <tr>
+    <td class="description">
+      <nobr>$Encoder.bodyEscape($ResourceBundle.getString('ConfRepositoryConnector.ConfProxyPortColon'))</nobr>
+    </td>
+    <td class="value">
+      <input size="5" type="text" id="confproxyport" name="confproxyport" value="$Encoder.attributeEscape($CONFPROXYPORT)" />
+    </td>
+  </tr>
+
+  <tr><td class="separator" colspan="2"><hr/></td></tr>
+
+  <tr>
+    <td class="description">
+      <nobr>$Encoder.bodyEscape($ResourceBundle.getString('ConfRepositoryConnector.ConfProxyDomainColon'))</nobr>
+    </td>
+    <td class="value">
+      <input size="32" type="text" id="confproxydomain" name="confproxydomain" value="$Encoder.attributeEscape($CONFPROXYDOMAIN)" />
+    </td>
+  </tr>
+  
+  <tr>
+    <td class="description">
+      <nobr>$Encoder.bodyEscape($ResourceBundle.getString('ConfRepositoryConnector.ConfProxyUsernameColon'))</nobr>
+    </td>
+    <td class="value">
+      <input size="16" type="text" id="confproxyusername" name="confproxyusername" value="$Encoder.attributeEscape($CONFPROXYUSERNAME)" />
+    </td>
+  </tr>
+  <tr>
+    <td class="description">
+      <nobr>$Encoder.bodyEscape($ResourceBundle.getString('ConfRepositoryConnector.ConfProxyPasswordColon'))</nobr>
+    </td>
+    <td class="value">
+      <input size="16" type="password" id="confproxypassword" name="confproxypassword" value="$Encoder.attributeEscape($CONFPROXYPASSWORD)" />
+    </td>
+  </tr>
+</table>
+
+#else
+
+<input type="hidden" name="confproxyhost" value="$Encoder.attributeEscape($CONFPROXYHOST)" />
+<input type="hidden" name="confproxyport" value="$Encoder.attributeEscape($CONFPROXYPORT)" />
+<input type="hidden" name="confproxydomain" value="$Encoder.attributeEscape($CONFPROXYDOMAIN)" />
+<input type="hidden" name="confproxyusername" value="$Encoder.attributeEscape($CONFPROXYUSERNAME)" />
+<input type="hidden" name="confproxypassword" value="$Encoder.attributeEscape($CONFPROXYPASSWORD)" />
+
+#end

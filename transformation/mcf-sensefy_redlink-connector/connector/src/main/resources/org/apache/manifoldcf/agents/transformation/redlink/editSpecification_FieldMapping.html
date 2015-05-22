@@ -1,0 +1,118 @@
+<!--
+ Licensed to the Apache Software Foundation (ASF) under one or more
+ contributor license agreements.  See the NOTICE file distributed with
+ this work for additional information regarding copyright ownership.
+ The ASF licenses this file to You under the Apache License, Version 2.0
+ (the "License"); you may not use this file except in compliance with
+ the License.  You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+ Unless required by applicable law or agreed to in writing, software
+ distributed under the License is distributed on an "AS IS" BASIS,
+ WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ See the License for the specific language governing permissions and
+ limitations under the License.
+-->
+#if($TABNAME == $ResourceBundle.getString('RedLinkEnhancer.Parameters') && ${SEQNUM} == ${SELECTEDNUM})
+
+<table class="displaytable">
+  <tr><td class="separator" colspan="2"><hr/></td></tr>
+	<tr>
+		<td class="description"><nobr>
+				$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.ApiKey'))
+			</nobr></td>
+		<td class="value"><input id="redlink_apikey_${SEQNUM}" type="text"
+			name="redlink_apikey_${SEQNUM}" value="$Encoder.attributeEscape($APIKEY)" /></td>
+	</tr>
+	<tr>
+		<td class="description"><nobr>
+				$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.AnalysisName'))
+			</nobr></td>
+		<td class="value"><input id="redlink_analysis_${SEQNUM}" type="text"
+			name="redlink_analysis_${SEQNUM}" value="$Encoder.attributeEscape($ANALYSIS)" /></td>
+	</tr>
+	<tr>
+		<td class="description"><nobr>
+				$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.CommonParameters'))
+				</nobr>
+		</td>
+		<td class="value"><input id="redlink_common_${SEQNUM}" name="redlink_common_${SEQNUM}" type="checkbox" #if( $COMMON eq "true" )checked #end value="true" /></td>
+	</tr>
+   
+    <tr><td class="separator" colspan="2"><hr/></td></tr>
+ 	<tr>
+  		<td colspan="2">
+  			<strong>Profiles</strong>
+  		</td>
+  	<tr>
+  	<!-- Freebase profile -->
+  	<tr>
+  		<td class="escription">
+  			<nobr>
+  				$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.FreebaseProfile'))
+  			</nobr>
+  		</td>
+  		<td class="value"><input id="redlink_profile_freebase_${SEQNUM}" name="redlink_profile_freebase_${SEQNUM}" type="checkbox" #if( $FREEBASE_PROFILE eq "true" )checked #end value="true" /></td>
+  	</tr>
+  	<!-- SKOS profile -->
+  	<tr>
+  		<td class="escription">
+  			<nobr>
+  				$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.SkosProfile'))
+  			</nobr>
+  		</td>
+  		<td class="value"><input id="redlink_profile_skos_${SEQNUM}" name="redlink_profile_skos_${SEQNUM}" type="checkbox" #if( $SKOS_PROFILE eq "true" )checked #end value="true" /></td>
+  	</tr>
+  	<!-- Default profile -->
+  	<tr>
+  		<td class="escription">
+  			<nobr>
+  				$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.DefaultProfile'))
+  			</nobr>
+  		</td>
+  		<td class="value"><input id="redlink_profile_default_${SEQNUM}" name="redlink_profile_default_${SEQNUM}" type="checkbox" #if( $DEFAULT_PROFILE eq "true" )checked #end value="true" /></td>
+  	</tr>
+  	 <tr><td class="separator" colspan="2"><hr/></td></tr>
+ </table>
+ <table id="entity_types_table_${SEQNUM}">
+ 	<thead>
+ 		<tr><td colspan="2">$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.EntityType'))</td></tr>
+ 		<tr><td>Field</td><td>$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.FieldName')) - $Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.LDPathExpression'))</td></tr>
+ 	</thead>
+ 	<tbody id="entity_types_table_body_${SEQNUM}">
+  		#set($count = ${ENTITY_TYPES.size()})
+		#if($count > 0) #set($len = $count - 1) 
+			#foreach($i in [0..$len])
+				#set($dynamicvar = "entity_type_$i")
+				#set($iplus = $i + 1)
+				<tr>
+					<td class="entity-type">${ENTITY_TYPES.get($i)} <span style="cursor: pointer; margin-left: 5px;" class="remove-entity-type">X</span></td>
+					<td class="entity-type-definitions">
+						#set($expressions = ${LDPATHS.get($i)})
+						<ul>
+						#foreach($expression in $expressions)
+								<li><span class="field-name">${expression.get("FIELD")}</span> - <span class="ldpath-expression">${expression.get("LDPATH_EXPRESSION")}</span><span style="cursor: pointer; margin-left: 5px;" class="remove-expression">X</span></li>
+						#end
+						</ul>
+						<div id="entity_type_${i}_add_field" class="entity-type-add-field">
+							<label>$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.FieldName'))</label><input name="entity_type_${i}_field_name_${SEQNUM}" type="text" class="entity-type-field" /><label>$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.LDPathExpression'))</label><input name="entity_type_${i}_ldpath${SEQNUM}" type="text" class="entity-type-ldpath" /><input type="button" value="Add" class="add-ldpath" />
+						</div>
+					</td>
+				</tr>				
+			#end
+		#end
+		<tr id="new_entity_type_row_${SEQNUM}">
+			<td colspan="2">
+				<label>$Encoder.bodyEscape($ResourceBundle.getString('RedLinkEnhancer.EntityTypeURI'))</label><input id="new_entity_type_${SEQNUM}" type="text" class="new-entity-type" name="new_entity_type_${SEQNUM}" /><input type="button" class="add-entity-type" name="new_entity_type_button_${SEQNUM}" value="Add Entity Type" />
+			</td>
+		</tr>
+ 	</tbody>
+ 	
+ </table>
+ 
+  <input type="hidden" id="redlink_json_conf_${SEQNUM}" name="redlink_json_conf_${SEQNUM}" value='$REDLINK_JSON_CONF'/>
+#else
+  <input type="hidden" id="redlink_json_conf_${SEQNUM}" name="redlink_json_conf_${SEQNUM}" value='$REDLINK_JSON_CONF'/>
+
+#end

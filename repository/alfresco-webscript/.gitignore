@@ -1,0 +1,12 @@
+.idea
+*.iwr
+*.ipr
+*.iml
+*.iws
+target
+.classpath
+.project
+target
+*.log
+*.log.*
+alf_data_dev

@@ -1,0 +1,7 @@
+<webscript>
+   <shortname>User Authorities</shortname>
+   <description>Get User Authorities</description>
+   <url>/manifold/userAuthorities?userName={userName}</url>
+   <format default="json">argument</format>
+   <authentication>admin</authentication>
+</webscript>
