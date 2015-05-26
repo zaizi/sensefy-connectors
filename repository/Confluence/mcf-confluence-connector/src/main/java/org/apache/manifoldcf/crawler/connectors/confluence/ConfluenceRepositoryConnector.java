@@ -787,78 +787,63 @@ public class ConfluenceRepositoryConnector extends BaseRepositoryConnector {
 				}
 
 				if (!scanOnly[i]) {
-					doLog = true;
+                    if (version!=null) {
+                        doLog = true;
+                        String contentId = nodeId;
+                        ConfluenceContent confContent = getContent(contentId);
+                        if (confContent == null) {
+                          activities.deleteDocument(nodeId);
+                          continue;
+                        }
+                        if (Logging.connectors.isDebugEnabled()) {
+                          Logging.connectors.debug("Confluence: This content exists: " + confContent.getID());
+                        }
+                        RepositoryDocument rd = new RepositoryDocument();
+                        String mimeType = "text/html";
+                        Date createdDate = confContent.getCreatedDate();
+                        Date modifiedDate = confContent.getCreatedDate();
+                        rd.setMimeType(mimeType);
+                        if (createdDate != null)
+                          rd.setCreatedDate(createdDate);
+                        if (modifiedDate != null)
+                          rd.setModifiedDate(modifiedDate);
+                        rd.setIndexingDate(new Date());
+                        // Get general document metadata
+                        Map<String,String[]> metadataMap = confContent.getMetadata();
+                        Logging.connectors.info("meta data : " + metadataMap);
 
-					///
-					String contentId = nodeId;
-					ConfluenceContent confContent = getContent(contentId);
-		            if (confContent == null) {
-		              activities.deleteDocument(nodeId);
-		              continue;
-		            }
-		            
-		            if (Logging.connectors.isDebugEnabled()) {
-		              Logging.connectors.debug("Confluence: This content exists: " + confContent.getID());
-		            }
+                        for (Entry<String, String[]> entry : metadataMap.entrySet()) {
+                          rd.addField(entry.getKey(), entry.getValue());
+                        }
+                        rd.addField("mimeType", mimeType);
+                        rd.addField("author", confContent.getCreatedByDisplayName());
+                        String documentURI = confContent.getWebURL();
+                        String document = confContent.getContent();
+                        try {
+                          byte[] documentBytes = document.getBytes(StandardCharsets.UTF_8);
+                          InputStream is = new ByteArrayInputStream(documentBytes);
+                          try {
+                            rd.setBinary(is, documentBytes.length);
 
-		            //otherwise process
-		            RepositoryDocument rd = new RepositoryDocument();
+                            //adding size
+                            //rd.addField("size_kb", (documentBytes.length/1024)+"");
+                            rd.addField("size", documentBytes.length+"");
 
+                            activities.ingestDocumentWithException(nodeId, version, documentURI, rd);
+                            // No errors.  Record the fact that we made it.
+                            errorCode = "OK";
+                            fileSize = new Long(documentBytes.length);
+                          } finally {
+                            is.close();
+                          }
+                        } catch (IOException e) {
+                          handleIOException(e);
+                        }
+                    } else{
+                        activities.deleteDocument(nodeId);
+                    }
 
-		            // Now do standard stuff
-		              
-		            String mimeType = "text/html";
-		            Date createdDate = confContent.getCreatedDate();
-		            Date modifiedDate = confContent.getCreatedDate();
-
-		            rd.setMimeType(mimeType);
-		            if (createdDate != null)
-		              rd.setCreatedDate(createdDate);
-		            if (modifiedDate != null)
-		              rd.setModifiedDate(modifiedDate);
-
-                    rd.setIndexingDate(new Date());
-		            // Get general document metadata
-		            Map<String,String[]> metadataMap = confContent.getMetadata();
-		            Logging.connectors.info("meta data : " + metadataMap);
-		              
-		            for (Entry<String, String[]> entry : metadataMap.entrySet()) {
-		              rd.addField(entry.getKey(), entry.getValue());
-		            }
-		            
-		            //add mime type
-		            rd.addField("mimeType", mimeType);
-
-
-		            //add author
-		            rd.addField("author", confContent.getCreatedByDisplayName());
-		            
-
-		            String documentURI = confContent.getWebURL();
-		            String document = confContent.getContent();
-		            
-		            try {
-		              byte[] documentBytes = document.getBytes(StandardCharsets.UTF_8);
-		              InputStream is = new ByteArrayInputStream(documentBytes);
-		              try {
-		                rd.setBinary(is, documentBytes.length);
-		                
-		                //adding size
-		                //rd.addField("size_kb", (documentBytes.length/1024)+"");
-		                rd.addField("size", documentBytes.length+"");
-		                
-		                activities.ingestDocumentWithException(nodeId, version, documentURI, rd);
-		                // No errors.  Record the fact that we made it.
-		                errorCode = "OK";
-		                fileSize = new Long(documentBytes.length);
-		              } finally {
-		                is.close();
-		              }
-		            } catch (IOException e) {
-		              handleIOException(e);
-		            }
-
-					////
+                    ////
 				}
 			} finally {
 				if (doLog)
