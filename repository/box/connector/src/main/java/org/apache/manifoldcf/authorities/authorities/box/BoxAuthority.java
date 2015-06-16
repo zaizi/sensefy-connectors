@@ -429,21 +429,28 @@ public class BoxAuthority extends
 			
 			if (response.getStatusLine().getStatusCode() == 200)
 			{
-				BufferedReader rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-
-				StringBuffer result = new StringBuffer();
-				String line = "";
-				while ((line = rd.readLine()) != null) {
-				    result.append(line);
-				}
 				
+				BufferedReader rd = null;
 				try {
+					rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+
+					StringBuffer result = new StringBuffer();
+					String line = "";
+					while ((line = rd.readLine()) != null) {
+					    result.append(line);
+					}
+					
+					
 					String jsonData = result.toString();
 					json = new JSONObject(jsonData);
 							
 				} catch (JSONException e) {
 					Logging.connectors.error("Error while json parsing",e);
 					throw new ManifoldCFException("Error while json parsing",e.getCause());
+				}
+				finally{
+					if(rd != null)
+					IOUtils.closeQuietly(rd);
 				}
 				
 			}
@@ -801,7 +808,7 @@ public class BoxAuthority extends
 
 		public String getCriticalSectionName() {
 			StringBuilder sb = new StringBuilder(getClass().getName());
-			sb.append("-").append(userName);
+			sb.append("-").append(userName).append("-").append(connectionString);
 			return sb.toString();
 		}
 
@@ -819,7 +826,7 @@ public class BoxAuthority extends
 
 		@Override
 		public int hashCode() {
-			return userName.hashCode() + 53;
+			return userName.hashCode() + + connectionString.hashCode();
 		}
 
 		@Override
@@ -831,7 +838,9 @@ public class BoxAuthority extends
 			if (!ard.userName.equals(userName)) {
 				return false;
 			}
-
+			if (!ard.connectionString.equals(connectionString)) {
+		        return false;
+		      }
 			return true;
 		}
 
