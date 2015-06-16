@@ -210,20 +210,6 @@ public class ConfluenceContent extends ConfluenceJSONResponse {
 	public Map<String,String[]> getMetadata() {	  
 				
 		Map<String,String[]> rmap = new HashMap<String,String[]>();
-			
-		//label
-		JSONObject metaData = (JSONObject) ((JSONObject) object).get(KEY_METADATA);
-		if(metaData != null)
-		{
-			JSONObject labelsJson = (JSONObject)metaData.get(KEY_LABELS);
-			if(metaData.get(KEY_LABELS) != null){
-				String[] labels = new String[] {metaData.get(KEY_LABELS).toString()};
-				rmap.put("labels", labels);
-			}
-			else{
-				rmap.put("labels", new String[]{""});
-			}
-		}		
 		
 		//name
 		rmap.put(KEY_NAME, new String[]{getTitle()});
