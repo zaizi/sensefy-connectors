@@ -19,6 +19,7 @@ package org.apache.manifoldcf.authorities.authorities.box;
 import com.box.sdk.BoxAPIConnection;
 import com.box.sdk.BoxAPIException;
 import com.box.sdk.BoxUser;
+
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang.StringUtils;
 import org.apache.http.HttpResponse;
@@ -38,6 +39,7 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URISyntaxException;
+import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -49,43 +51,40 @@ import java.util.Locale;
 public class BoxAuthority extends
 		org.apache.manifoldcf.authorities.authorities.BaseAuthorityConnector {
 
-
 	public static final String _rcsid = "@(#)$Id: BoxAuthority.java 1225063 2015-04-07 00:42:19Z kwright $";
-    public static final String USER_PERMISSION_TYPE = "user";
-    public static final String GROUP_PERMISSION_TYPE = "group";
+	public static final String USER_PERMISSION_TYPE = "user";
+	public static final String USER_LOGIN_EMAIL = "loginMail";
+	public static final String GROUP_PERMISSION_TYPE = "group";
 
-    public int apiResponseCode = 400;
+	public int apiResponseCode = 400;
 
 	private long responseLifetime = 60000L; // 60sec
 
 	private int LRUsize = 1000;
 
-
 	private boolean isConnected;
 
 	private String clientId;
 
-	private String clientSecret;	
-	
+	private String clientSecret;
+
 	private String username;
-	
+
 	private String password;
-	
+
 	private String accessToken;
 
 	private String refreshToken;
-	
+
 	private String apiUrl;
 
 	private BoxAPIConnection api;
-	
+
 	protected BoxSession session = null;
 
-    protected long lastSessionFetch = -1L;	
-	
-	private final static String AUTH_ERR_MSG = "Authentication failure in box, Please check you your refresh and access tokens, if your refresh token is invalid you may have generate a new one manually"; 
-	
-	
+	protected long lastSessionFetch = -1L;
+
+	private final static String AUTH_ERR_MSG = "Authentication failure in box, Please check you your refresh and access tokens, if your refresh token is invalid you may have generate a new one manually";
 
 	/**
 	 * Cache manager.
@@ -100,14 +99,13 @@ public class BoxAuthority extends
 
 	private static final AuthorizationResponse unreachableResponse = new AuthorizationResponse(
 			new String[] { globalDenyToken },
-			AuthorizationResponse.RESPONSE_UNREACHABLE);	
-	
+			AuthorizationResponse.RESPONSE_UNREACHABLE);
 
 	/**
 	 * Constructor.
 	 */
 	public BoxAuthority() {
-		isConnected = false;	
+		isConnected = false;
 		api = null;
 		apiUrl = BoxConfig.API_URL;
 	}
@@ -116,7 +114,7 @@ public class BoxAuthority extends
 	public void setThreadContext(IThreadContext tc) throws ManifoldCFException {
 		super.setThreadContext(tc);
 		cacheManager = CacheManagerFactory.make(tc);
-		
+
 	}
 
 	/**
@@ -127,76 +125,85 @@ public class BoxAuthority extends
 	 */
 	@Override
 	public void connect(ConfigParams configParams) {
-		super.connect(configParams);		
+		super.connect(configParams);
 		isConnected = false;
 
 		clientId = configParams.getParameter("client_id");
 		clientSecret = configParams.getObfuscatedParameter("client_secret");
 		username = configParams.getParameter("username");
 		password = configParams.getObfuscatedParameter("password");
-		
-		
+
 		if (clientId == null || StringUtils.isEmpty(clientId)) {
 			Logging.connectors.error("Client id is not present");
 		}
-		
-		if(clientSecret == null || StringUtils.isEmpty(clientSecret))
-			Logging.connectors.error("Client secret is not present");
-		
-		if(username == null || StringUtils.isEmpty(username))
-			Logging.connectors.error("username is not present");
-		
-		if(password == null || StringUtils.isEmpty(password))
-			Logging.connectors.error("password is not present");
-		
-	}
-	
-	/**
-     * Set up a session
-     */
-    private void getSession()
-            throws ManifoldCFException {
-        if (session == null || !session.isValid()) {
-            if (StringUtils.isEmpty(clientId))
-                throw new ManifoldCFException("Parameter " + BoxConfig.CLIENT_ID + " required but not set");
-            if (StringUtils.isEmpty(clientSecret))
-                throw new ManifoldCFException("Parameter " + BoxConfig.CLIENT_SECRET + " required but not set");
-            if (StringUtils.isEmpty(username))
-                throw new ManifoldCFException("Parameter " + BoxConfig.USERNAME + " required but not set");
-            if (StringUtils.isEmpty(password))
-                throw new ManifoldCFException("Parameter " + BoxConfig.PASSWORD + " required but not set");
 
-            try {
-                session = new BoxSession(clientId, clientSecret, username, password);                
-            } 
-            catch (RuntimeException e) {
-                throw new ManifoldCFException("[Box Session] Manifold Exception : ",e);
-            } catch (URISyntaxException e) {
-                throw new ManifoldCFException("[Box Session] Wrong URI :",e);
-            } catch (IOException e) {
-                throw new ManifoldCFException("[Box Session] Not possible to access Box API:",e);
-            }
-            lastSessionFetch = System.currentTimeMillis();
-            
-        }
-    }
-	
-	private boolean validateApiConnection(BoxAPIConnection api) throws ManifoldCFException {		
-		if(api == null)
-			return false;		
+		if (clientSecret == null || StringUtils.isEmpty(clientSecret))
+			Logging.connectors.error("Client secret is not present");
+
+		if (username == null || StringUtils.isEmpty(username))
+			Logging.connectors.error("username is not present");
+
+		if (password == null || StringUtils.isEmpty(password))
+			Logging.connectors.error("password is not present");
+
+	}
+
+	/**
+	 * Set up a session
+	 */
+	private void getSession() throws ManifoldCFException {
+		if (session == null || !session.isValid()) {
+			if (StringUtils.isEmpty(clientId))
+				throw new ManifoldCFException("Parameter "
+						+ BoxConfig.CLIENT_ID + " required but not set");
+			if (StringUtils.isEmpty(clientSecret))
+				throw new ManifoldCFException("Parameter "
+						+ BoxConfig.CLIENT_SECRET + " required but not set");
+			if (StringUtils.isEmpty(username))
+				throw new ManifoldCFException("Parameter " + BoxConfig.USERNAME
+						+ " required but not set");
+			if (StringUtils.isEmpty(password))
+				throw new ManifoldCFException("Parameter " + BoxConfig.PASSWORD
+						+ " required but not set");
+
+			try {
+				session = new BoxSession(clientId, clientSecret, username,
+						password);
+			} catch (RuntimeException e) {
+				throw new ManifoldCFException(
+						"[Box Session] Manifold Exception : ", e);
+			} catch (URISyntaxException e) {
+				throw new ManifoldCFException("[Box Session] Wrong URI :", e);
+			} catch (IOException e) {
+				throw new ManifoldCFException(
+						"[Box Session] Not possible to access Box API:", e);
+			}
+			lastSessionFetch = System.currentTimeMillis();
+
+		}
+	}
+
+	private boolean validateApiConnection(BoxAPIConnection api)
+			throws ManifoldCFException {
+		if (api == null)
+			return false;
 		boolean valid = false;
 		try {
 			return validateByCurrentUser(api);
 		} catch (BoxAPIException e) {
-			apiResponseCode = e.getResponseCode();			
-			
-			Logging.connectors.error("Exception in getting user information , probabably invalid connection, API response code "+apiResponseCode,e);
+			apiResponseCode = e.getResponseCode();
+
+			Logging.connectors
+					.error("Exception in getting user information , probabably invalid connection, API response code "
+							+ apiResponseCode, e);
 			valid = false;
-		} catch(Exception e){
-			Logging.connectors.error("Exception in getting user information , probabably invalid connection",e);
+		} catch (Exception e) {
+			Logging.connectors
+					.error("Exception in getting user information , probabably invalid connection",
+							e);
 			valid = false;
 		}
-		
+
 		return valid;
 	}
 
@@ -206,7 +213,7 @@ public class BoxAuthority extends
 		valid = user != null;
 		return valid;
 	}
-	
+
 	// All methods below this line will ONLY be called if a connect() call
 	// succeeded
 	// on this instance!
@@ -215,27 +222,27 @@ public class BoxAuthority extends
 	 * Check connection for sanity.
 	 */
 	@Override
-	public String check() throws ManifoldCFException {		
+	public String check() throws ManifoldCFException {
 		try {
-            getSession();
-            BoxAPIConnection apiConn = session.getApi();
-            if (validateApiConnection(apiConn)) {
-            	return super.check();
+			getSession();
+			BoxAPIConnection apiConn = session.getApi();
+			if (validateApiConnection(apiConn)) {
+				return super.check();
+			} else {
+				return "Connection failed: "
+						+ "Validating api connection status failed";
 			}
-            else{
-            	return "Connection failed: " + "Validating api connection status failed";
-            }
-        } catch (BoxAPIException e) {
-            Logging.connectors.error("Connection Failed ", e);
-            return "Connection failed: " + e.getMessage();
-        }catch (ManifoldCFException e) {
-            Logging.connectors.error("Connection Failed ", e);
-            Throwable cause = e.getCause();
-            return "Connection failed: " + cause.getMessage();
-        } catch (RuntimeException e) {
-            Logging.connectors.error("Connection Failed ", e);
-            return "Connection failed: " + e.getMessage();
-        }
+		} catch (BoxAPIException e) {
+			Logging.connectors.error("Connection Failed ", e);
+			return "Connection failed: " + e.getMessage();
+		} catch (ManifoldCFException e) {
+			Logging.connectors.error("Connection Failed ", e);
+			Throwable cause = e.getCause();
+			return "Connection failed: " + cause.getMessage();
+		} catch (RuntimeException e) {
+			Logging.connectors.error("Connection Failed ", e);
+			return "Connection failed: " + e.getMessage();
+		}
 	}
 
 	/**
@@ -282,37 +289,39 @@ public class BoxAuthority extends
 	@Override
 	public AuthorizationResponse getAuthorizationResponse(String userName)
 			throws ManifoldCFException {
-		
+
 		ICacheDescription objectDescription = new BoxAuthorizationResponseDescription(
 				userName, createCacheConnectionString(), this.responseLifetime,
 				this.LRUsize);
-		
-		// Enter the cache
-	    ICacheHandle ch = cacheManager.enterCache(new ICacheDescription[]{objectDescription}, null, null);    
-	 
-	   
-	    try {
-	      ICacheCreateHandle createHandle = cacheManager.enterCreateSection(ch);
-	      try {
-	        // Lookup the object
-	        AuthorizationResponse response = (AuthorizationResponse) cacheManager.lookupObject(createHandle, objectDescription);
-	        if (response != null) {
-	          return response;
-	        }
-	        // Create the object.
-	        response = getAuthorizationResponseUncached(userName);
-	        // Save it in the cache
-	        cacheManager.saveObject(createHandle, objectDescription, response);
-	        // And return it...
-	        return response;
-	      } finally {
-	        cacheManager.leaveCreateSection(createHandle);
-	      }
-	    } finally {
-	      cacheManager.leaveCache(ch);
-	    }
 
-		
+		// Enter the cache
+		ICacheHandle ch = cacheManager.enterCache(
+				new ICacheDescription[] { objectDescription }, null, null);
+
+		try {
+			ICacheCreateHandle createHandle = cacheManager
+					.enterCreateSection(ch);
+			try {
+				// Lookup the object
+				AuthorizationResponse response = (AuthorizationResponse) cacheManager
+						.lookupObject(createHandle, objectDescription);
+				if (response != null) {
+					return response;
+				}
+				// Create the object.
+				response = getAuthorizationResponseUncached(userName);
+				// Save it in the cache
+				cacheManager.saveObject(createHandle, objectDescription,
+						response);
+				// And return it...
+				return response;
+			} finally {
+				cacheManager.leaveCreateSection(createHandle);
+			}
+		} finally {
+			cacheManager.leaveCache(ch);
+		}
+
 	}
 
 	private AuthorizationResponse getAuthorizationResponseUncached(
@@ -323,56 +332,66 @@ public class BoxAuthority extends
 		}
 		try {
 			Logging.connectors.info("Getting the user id from box api");
-			String userId = getBoxUserId(userName);
-            if(userId!=null&&!userId.isEmpty())
-                tokens.add(USER_PERMISSION_TYPE+"-"+userId);
-			Logging.connectors.info(String.format("User id is : %s, getting memberships....",userId));
-			if(StringUtils.isNotEmpty(userId)){
-				ArrayList<String> memberShips = getMemberShips(userId);
-				if(memberShips != null){
-					Logging.connectors.info(String.format("There are %s, groups returned for user name %s",memberShips.size(),userName));
-                    tokens.addAll(memberShips);
-					return new AuthorizationResponse(tokens.toArray(new String[tokens.size()]),AuthorizationResponse.RESPONSE_OK);
-				}
+			UserInfo boxUserInfo = getBoxUserId(userName);
+			if (boxUserInfo != null && boxUserInfo.getUserId() != null && !boxUserInfo.getUserId().isEmpty()) {
+				tokens.add(USER_PERMISSION_TYPE + "-" + boxUserInfo.getUserId());
+				tokens.add(USER_LOGIN_EMAIL + "-" + URLDecoder.decode(boxUserInfo.getLogin()));
+				Logging.connectors.info(String.format("User id is : %s, getting memberships....", boxUserInfo.getUserId() ));
 			}
 			
+			if (boxUserInfo != null && StringUtils.isNotEmpty(boxUserInfo.getUserId())) {
+				ArrayList<String> memberShips = getMemberShips(boxUserInfo.getUserId());
+				if (memberShips != null) {
+					Logging.connectors.info(String.format(
+							"There are %s, groups returned for user name %s",
+							memberShips.size(), userName));
+					tokens.addAll(memberShips);
+					return new AuthorizationResponse(
+							tokens.toArray(new String[tokens.size()]),
+							AuthorizationResponse.RESPONSE_OK);
+				}
+			}
+
 		} catch (ClientProtocolException e) {
 			throw new ManifoldCFException(e.getCause());
 		} catch (IOException e) {
 			throw new ManifoldCFException(e.getCause());
 		}
-	    
-		return new AuthorizationResponse(tokens.toArray(new String[tokens.size()]),AuthorizationResponse.RESPONSE_USERUNAUTHORIZED);
-	}	
-	
-	private ArrayList<String> getMemberShips(String userId) throws ManifoldCFException {
-		String apiUrl  = getApiUrl(); 
+
+		return new AuthorizationResponse(tokens.toArray(new String[tokens
+				.size()]), AuthorizationResponse.RESPONSE_USERUNAUTHORIZED);
+	}
+
+	private ArrayList<String> getMemberShips(String userId)
+			throws ManifoldCFException {
+		String apiUrl = getApiUrl();
 		ArrayList<String> groupsBelongedTo = new ArrayList<String>();
-		String requestUrl = String.format("%s/users/%s/memberships",apiUrl,userId);
+		String requestUrl = String.format("%s/users/%s/memberships", apiUrl,
+				userId);
 		try {
 			JSONObject json = getResultFromApi(requestUrl);
 			try {
 				JSONArray jArr = json.getJSONArray("entries");
 				for (int i = 0; i < jArr.length(); ++i) {
 					JSONObject entry = jArr.getJSONObject(i);
-					
-					if(entry != null){
+
+					if (entry != null) {
 						JSONObject groupObj = entry.getJSONObject("group");
-						if(groupObj != null){
-							//group id to be returned
-							groupsBelongedTo.add(GROUP_PERMISSION_TYPE +"-"+groupObj.getString("id"));
+						if (groupObj != null) {
+							// group id to be returned
+							groupsBelongedTo.add(GROUP_PERMISSION_TYPE + "-"
+									+ groupObj.getString("id"));
 						}
 					}
-				}				
+				}
 
-				
 			} catch (JSONException e) {
-				Logging.connectors.error("Error while json parsing",e);
+				Logging.connectors.error("Error while json parsing", e);
 				throw new ManifoldCFException(e.getCause());
 			}
-			
+
 		} catch (ManifoldCFException e) {
-			Logging.connectors.error("error while getting json",e);
+			Logging.connectors.error("error while getting json", e);
 			throw new ManifoldCFException(e.getCause());
 		}
 
@@ -384,115 +403,120 @@ public class BoxAuthority extends
 		if (apiUrl == null || StringUtils.isEmpty(apiUrl)) {
 			apiUrl = BoxConfig.API_URL;
 			apiUrlValue = apiUrl;
-		}
-		else	
-		{
+		} else {
 			apiUrlValue = apiUrl;
 		}
-		Logging.connectors.info("Api url : "+apiUrlValue);
-		
+		Logging.connectors.info("Api url : " + apiUrlValue);
+
 		return apiUrlValue;
 	}
 
-	private String getBoxUserId(String userName) throws ClientProtocolException, IOException, ManifoldCFException {
+	private UserInfo getBoxUserId(String userName)
+			throws ClientProtocolException, IOException, ManifoldCFException {
 		String userId = "";
+		String email = "";
+		UserInfo userInfo = null;
 		String apiUrl = getApiUrl();
-		String requestUrl = String.format("%s/users?filter_term=%s",apiUrl,userName);
+		String requestUrl = String.format("%s/users?filter_term=%s", apiUrl,
+				userName);
 		JSONObject json = getResultFromApi(requestUrl);
 		try {
 			JSONArray jArr = json.getJSONArray("entries");
-			if(jArr != null && jArr.length() > 0){
+			if (jArr != null && jArr.length() > 0) {
 				JSONObject jObj = jArr.getJSONObject(0);
-				if(jObj != null)
-				userId = jObj.getString("id");
+				if (jObj != null) {
+					userInfo = new UserInfo();
+					userId = jObj.getString("id");
+					email = jObj.getString("login");
+					userInfo.setLogin(email);
+					userInfo.setUserId(userId);
+				}
 			}
 		} catch (JSONException e) {
-			Logging.connectors.error("Error while json parsing",e);
+			Logging.connectors.error("Error while json parsing", e);
 			throw new ManifoldCFException(e.getCause());
 		}
-		
-		return userId;
+
+		return userInfo;
 	}
-	
-	private JSONObject getResultFromApi(String requestUrl) throws ManifoldCFException{
+
+	private JSONObject getResultFromApi(String requestUrl)
+			throws ManifoldCFException {
 		JSONObject json = null;
 		DefaultHttpClient httpClient = new DefaultHttpClient();
-		
-		//get the latest access token
+
+		// get the latest access token
 		checkAndInitializeAccessToken();
-		
+
 		try {
 			HttpGet getRequest = new HttpGet(requestUrl);
-			String authorizationHeader = String.format("Bearer %s",accessToken);
-			getRequest.setHeader("Authorization", authorizationHeader);			
-			HttpResponse response = httpClient.execute(getRequest);	
-			
-			if (response.getStatusLine().getStatusCode() == 200)
-			{
-				
+			String authorizationHeader = String
+					.format("Bearer %s", accessToken);
+			getRequest.setHeader("Authorization", authorizationHeader);
+			HttpResponse response = httpClient.execute(getRequest);
+
+			if (response.getStatusLine().getStatusCode() == 200) {
+
 				BufferedReader rd = null;
 				try {
-					rd = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
+					rd = new BufferedReader(new InputStreamReader(response
+							.getEntity().getContent()));
 
 					StringBuffer result = new StringBuffer();
 					String line = "";
 					while ((line = rd.readLine()) != null) {
-					    result.append(line);
+						result.append(line);
 					}
-					
-					
+
 					String jsonData = result.toString();
 					json = new JSONObject(jsonData);
-							
+
 				} catch (JSONException e) {
-					Logging.connectors.error("Error while json parsing",e);
-					throw new ManifoldCFException("Error while json parsing",e.getCause());
+					Logging.connectors.error("Error while json parsing", e);
+					throw new ManifoldCFException("Error while json parsing",
+							e.getCause());
+				} finally {
+					if (rd != null)
+						IOUtils.closeQuietly(rd);
 				}
-				finally{
-					if(rd != null)
-					IOUtils.closeQuietly(rd);
-				}
-				
+
+			} else {
+				if (response != null && response.getStatusLine() != null)
+					Logging.connectors.warn("Http response code : "
+							+ response.getStatusLine().getStatusCode());
+
+				throw new ManifoldCFException(
+						"Box api response is not valid, response code");
 			}
-			else{
-				if(response != null && response.getStatusLine() != null)
-					Logging.connectors.warn("Http response code : "+response.getStatusLine().getStatusCode());
-				
-				throw new ManifoldCFException("Box api response is not valid, response code");
-			}
-			
-			
+
 		} catch (IllegalStateException e) {
 			throw new ManifoldCFException(e.getCause());
-		} catch(Exception e){
+		} catch (Exception e) {
 			throw new ManifoldCFException(e.getCause());
+		} finally {
+			IOUtils.closeQuietly(httpClient);
 		}
-		finally{			
-			IOUtils.closeQuietly(httpClient);			
-		}
-		
-		
+
 		return json;
 	}
 
 	private void checkAndInitializeAccessToken() throws ManifoldCFException {
-		if(session != null && session.isValid()){
-			if(session.getApi() != null)
+		if (session != null && session.isValid()) {
+			if (session.getApi() != null)
 				accessToken = session.getApi().getAccessToken();
-			}
-		else{
+		} else {
 			getSession();
-			if(session != null && session.isValid())
-			{
+			if (session != null && session.isValid()) {
 				accessToken = session.getApi().getAccessToken();
 			}
-			
+
 		}
-		Logging.connectors.info("Access token at this moment is "+ accessToken);
+		Logging.connectors
+				.info("Access token at this moment is " + accessToken);
 	}
 
 	@Override
-	public AuthorizationResponse getDefaultAuthorizationResponse(String userName) {	
+	public AuthorizationResponse getDefaultAuthorizationResponse(String userName) {
 
 		return unreachableResponse;
 	}
@@ -504,12 +528,13 @@ public class BoxAuthority extends
 		return value;
 	}
 
-    private String getObfuscatedParam(ConfigParams parameters, String name, String def) {
-        String value = "";
-        value = parameters.getObfuscatedParameter(name) != null ? parameters
-                .getObfuscatedParameter(name) : def;
-        return value;
-    }
+	private String getObfuscatedParam(ConfigParams parameters, String name,
+			String def) {
+		String value = "";
+		value = parameters.getObfuscatedParameter(name) != null ? parameters
+				.getObfuscatedParameter(name) : def;
+		return value;
+	}
 
 	private String getViewParam(ConfigParams parameters, String name) {
 		String value = "";
@@ -528,16 +553,15 @@ public class BoxAuthority extends
 		return true;
 	}
 
-    private boolean copyObfuscatedParam(IPostParameters variableContext,
-                              ConfigParams parameters, String name) {
-        String val = variableContext.getParameter(name);
-        if (val == null) {
-            return false;
-        }
-        parameters.setObfuscatedParameter(name, val);
-        return true;
-    }
-	
+	private boolean copyObfuscatedParam(IPostParameters variableContext,
+			ConfigParams parameters, String name) {
+		String val = variableContext.getParameter(name);
+		if (val == null) {
+			return false;
+		}
+		parameters.setObfuscatedParameter(name, val);
+		return true;
+	}
 
 	// UI support methods.
 	/*
@@ -560,29 +584,28 @@ public class BoxAuthority extends
 
 		tabsArray.add(Messages.getString(locale, "BOX.BOX"));
 		buildJavaScriptCheck(out, locale);
-		
+
 	}
 
 	private void buildJavaScriptCheck(IHTTPOutput out, Locale locale)
 			throws IOException {
-		
-		out.print(
-			      "<script type=\"text/javascript\">\n"
-			      + "<!--\n"
-			      + "function checkConfig() {\n"
-			      + "  return true;\n"
-			      + "}\n"
-			      + "\n"
-			      + "function checkConfigForSave() {\n"
-			      + "  if (editconnection.client_id.value == \"\") {\n"
-			      + "    alert(\"" + Messages.getBodyJavascriptString(locale,
-							"BOX.client_id_cannot_be_blank")  + "\");\n"
-			      + "    SelectTab(\"" + Messages.getBodyJavascriptString(locale, "BOX.BOX") + "\");\n"
-			      + "    editconnection.client_id.focus();\n"
-			      + "    return false;\n"
-			      + "  }\n");
-		
-		
+
+		out.print("<script type=\"text/javascript\">\n"
+				+ "<!--\n"
+				+ "function checkConfig() {\n"
+				+ "  return true;\n"
+				+ "}\n"
+				+ "\n"
+				+ "function checkConfigForSave() {\n"
+				+ "  if (editconnection.client_id.value == \"\") {\n"
+				+ "    alert(\""
+				+ Messages.getBodyJavascriptString(locale,
+						"BOX.client_id_cannot_be_blank") + "\");\n"
+				+ "    SelectTab(\""
+				+ Messages.getBodyJavascriptString(locale, "BOX.BOX")
+				+ "\");\n" + "    editconnection.client_id.focus();\n"
+				+ "    return false;\n" + "  }\n");
+
 		out.print("  if (editconnection.client_secret.value == \"\") {\n"
 				+ "    alert(\""
 				+ Messages.getBodyJavascriptString(locale,
@@ -599,7 +622,7 @@ public class BoxAuthority extends
 				+ Messages.getBodyJavascriptString(locale, "BOX.BOX")
 				+ "\");\n" + "    editconnection.username.focus();\n"
 				+ "    return false;\n" + "  }\n");
-		
+
 		out.print("  if (editconnection.password.value == \"\") {\n"
 				+ "    alert(\""
 				+ Messages.getBodyJavascriptString(locale,
@@ -608,19 +631,15 @@ public class BoxAuthority extends
 				+ Messages.getBodyJavascriptString(locale, "BOX.BOX")
 				+ "\");\n" + "    editconnection.password.focus();\n"
 				+ "    return false;\n" + "  }\n");
-		
-		
-		out.print("  return true;\n"
-			      + "}\n");
-		
-		
+
+		out.print("  return true;\n" + "}\n");
+
 		out.print(" function endsWith(str, suffix) {"
-				+" return str.indexOf(suffix, str.length - suffix.length) !== -1;"
-				+"}\n");
-		
-		out.print(	       "//-->\n"
-			      + "</script>\n");
-		
+				+ " return str.indexOf(suffix, str.length - suffix.length) !== -1;"
+				+ "}\n");
+
+		out.print("//-->\n" + "</script>\n");
+
 	}
 
 	/*
@@ -636,17 +655,16 @@ public class BoxAuthority extends
 			IHTTPOutput out, Locale locale, ConfigParams parameters,
 			String tabName) throws ManifoldCFException, IOException {
 		String fClientId = getParam(parameters, "client_id", "");
-		String fClientSecret = getObfuscatedParam(parameters, "client_secret", "");
+		String fClientSecret = getObfuscatedParam(parameters, "client_secret",
+				"");
 		String fUsername = getParam(parameters, "username", "");
 		String fPassword = getObfuscatedParam(parameters, "password", "");
-		
 
 		if (tabName.equals(Messages.getString(locale, "BOX.BOX"))) {
 			buildBoxConfigSection(out, locale, fClientId, fClientSecret,
 					fUsername, fPassword);
 		}
 
-		
 	}
 
 	private void buildBoxConfigSection(IHTTPOutput out, Locale locale,
@@ -671,15 +689,14 @@ public class BoxAuthority extends
 				+ " </tr>\n"
 				+ " <tr>\n"
 				+ "  <td class=\"description\"><nobr>"
-				+ Messages
-						.getBodyString(locale, "BOX.username")
+				+ Messages.getBodyString(locale, "BOX.username")
 				+ "</nobr></td>\n"
 				+ "  <td class=\"value\"><input type=\"text\" size=\"50\" name=\"username\" value=\""
 				+ Encoder.attributeEscape(fUsername)
 				+ "\"/></td>\n"
 				+ " </tr>\n"
 				+ " <tr>\n"
-				
+
 				+ "  <td class=\"description\"><nobr>"
 				+ Messages.getBodyString(locale, "BOX.password")
 				+ "</nobr></td>\n"
@@ -687,7 +704,7 @@ public class BoxAuthority extends
 				+ Encoder.attributeEscape(fPassword)
 				+ "\"/></td>\n"
 				+ " </tr>\n");
-		
+
 		out.print("</table>\n");
 	}
 
@@ -703,11 +720,12 @@ public class BoxAuthority extends
 			IPostParameters variableContext, Locale locale,
 			ConfigParams parameters) throws ManifoldCFException {
 		copyParam(variableContext, parameters, BoxConfig.CLIENT_ID);
-		copyObfuscatedParam(variableContext, parameters, BoxConfig.CLIENT_SECRET);
+		copyObfuscatedParam(variableContext, parameters,
+				BoxConfig.CLIENT_SECRET);
 		copyParam(variableContext, parameters, BoxConfig.USERNAME);
-        copyObfuscatedParam(variableContext, parameters, BoxConfig.PASSWORD);
-	    
-	    return null;
+		copyObfuscatedParam(variableContext, parameters, BoxConfig.PASSWORD);
+
+		return null;
 	}
 
 	/*
@@ -721,14 +739,14 @@ public class BoxAuthority extends
 	public void viewConfiguration(IThreadContext threadContext,
 			IHTTPOutput out, Locale locale, ConfigParams parameters)
 			throws ManifoldCFException, IOException {
-		
+
 		buildViewBodyForBox(out, locale, parameters);
 	}
 
 	private void buildViewBodyForBox(IHTTPOutput out, Locale locale,
 			ConfigParams parameters) throws IOException {
 		String f_clientId = getViewParam(parameters, "client_id");
-		String f_username = getViewParam(parameters, "username");		
+		String f_username = getViewParam(parameters, "username");
 
 		out.print("<table class=\"displaytable\">\n"
 				+ " <tr><td class=\"separator\" colspan=\"2\"><hr/></td></tr>\n"
@@ -747,7 +765,7 @@ public class BoxAuthority extends
 				+ "*************"
 				+ "</td>\n"
 				+ " </tr>\n"
-				
+
 				+ " <tr>\n"
 				+ "  <td class=\"description\"><nobr>"
 				+ Messages.getBodyString(locale, "BOX.username")
@@ -756,18 +774,17 @@ public class BoxAuthority extends
 				+ f_username
 				+ "</td>\n"
 				+ " </tr>\n"
-				
+
 				+ " <tr>\n"
 				+ "  <td class=\"description\"><nobr>"
 				+ Messages.getBodyString(locale, "BOX.password")
 				+ "</nobr></td>\n"
 				+ "  <td class=\"value\">"
 				+ "***************" + "</td>\n" + " </tr>\n");
-				
 
 		out.print("</table>\n");
 	}
-	
+
 	// Protected methods
 	protected static StringSet emptyStringSet = new StringSet();
 
@@ -792,14 +809,14 @@ public class BoxAuthority extends
 		 * The expiration time
 		 */
 		protected long expirationTime = -1;
-		
-		/**
-	     * LDAP connection string with server name and base DN
-	     */
-	    protected String connectionString;
 
-		public BoxAuthorizationResponseDescription(String userName, String connectionString,
-				long responseLifetime, int LRUsize) {
+		/**
+		 * LDAP connection string with server name and base DN
+		 */
+		protected String connectionString;
+
+		public BoxAuthorizationResponseDescription(String userName,
+				String connectionString, long responseLifetime, int LRUsize) {
 			super("LDAPAuthority", LRUsize);
 			this.userName = userName;
 			this.responseLifetime = responseLifetime;
@@ -808,7 +825,8 @@ public class BoxAuthority extends
 
 		public String getCriticalSectionName() {
 			StringBuilder sb = new StringBuilder(getClass().getName());
-			sb.append("-").append(userName).append("-").append(connectionString);
+			sb.append("-").append(userName).append("-")
+					.append(connectionString);
 			return sb.toString();
 		}
 
@@ -826,7 +844,7 @@ public class BoxAuthority extends
 
 		@Override
 		public int hashCode() {
-			return userName.hashCode() + + connectionString.hashCode();
+			return userName.hashCode() + +connectionString.hashCode();
 		}
 
 		@Override
@@ -839,8 +857,8 @@ public class BoxAuthority extends
 				return false;
 			}
 			if (!ard.connectionString.equals(connectionString)) {
-		        return false;
-		      }
+				return false;
+			}
 			return true;
 		}
 
