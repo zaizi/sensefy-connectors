@@ -91,8 +91,9 @@ public class BoxRepositoryConnector
     /**
      * Box Permission types
      */
-    public static final String USER_PERMISSION_TYPE = "user";
-    public static final String GROUP_PERMISSION_TYPE = "group";
+    private static final String USER_PERMISSION_TYPE = "user";
+    private static final String GROUP_PERMISSION_TYPE = "group";
+    private static final String MAIL_PERMISSION_TYPE = "loginMail";
     public static final String URL = "url";
     public static final String BOX_FOLDER_PATH = "boxpath";
     public static final String BOX_BASE_ENDPOINT = "https://app.box.com";
@@ -788,17 +789,24 @@ public class BoxRepositoryConnector
         BoxFolder.Info info = parentFolder.getInfo("owned_by");
         BoxUser.Info ownedBy = info.getOwnedBy();
         aclPermissions.add(USER_PERMISSION_TYPE + "-" + ownedBy.getID());
+        if(ownedBy.getLogin()!=null && !ownedBy.getLogin().isEmpty())
+            aclPermissions.add(MAIL_PERMISSION_TYPE + "-" + ownedBy.getLogin());
         // Then let's iterate over all the collaborators
         Collection<BoxCollaboration.Info> collaborations = parentFolder.getCollaborations();
         for (BoxCollaboration.Info collaborationInfo : collaborations) {
             BoxCollaboration.Role role = collaborationInfo.getRole();
             if (isReaderRole(role)) {
                 BoxCollaborator.Info accessibleBy = collaborationInfo.getAccessibleBy();
-                if (accessibleBy instanceof BoxUser.Info)
+                String loginPermission=null;
+                if (accessibleBy instanceof BoxUser.Info) {
                     permissionType = USER_PERMISSION_TYPE;
+                    loginPermission=((BoxUser.Info) accessibleBy).getLogin();
+                }
                 else if (accessibleBy instanceof BoxGroup.Info)
                     permissionType = GROUP_PERMISSION_TYPE;
                 aclPermissions.add(permissionType + "-" + accessibleBy.getID());
+                if(loginPermission!=null && !loginPermission.isEmpty())
+                    aclPermissions.add(MAIL_PERMISSION_TYPE + "-" + loginPermission);
             }
         }
         return aclPermissions;
