@@ -3,7 +3,6 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.zaizi.sensefy</groupId>
     <artifactId>sensefy-connectors</artifactId>
-    <version>1.0</version>
     <name>Sensefy ManifoldCF Connectors</name>
     <packaging>pom</packaging>
     
