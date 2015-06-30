@@ -16,25 +16,6 @@
  */
 package org.apache.manifoldcf.authorities.authorities.box;
 
-import com.box.sdk.BoxAPIConnection;
-import com.box.sdk.BoxAPIException;
-import com.box.sdk.BoxUser;
-
-import org.apache.commons.io.IOUtils;
-import org.apache.commons.lang.StringUtils;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.manifoldcf.authorities.interfaces.AuthorizationResponse;
-import org.apache.manifoldcf.core.interfaces.*;
-import org.apache.manifoldcf.crawler.connectors.box.BoxSession;
-import org.apache.manifoldcf.crawler.system.Logging;
-import org.apache.manifoldcf.ui.util.Encoder;
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -43,6 +24,37 @@ import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import org.apache.commons.io.IOUtils;
+import org.apache.commons.lang.StringUtils;
+import org.apache.http.HttpResponse;
+import org.apache.http.client.ClientProtocolException;
+import org.apache.http.client.methods.HttpGet;
+import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.manifoldcf.authorities.interfaces.AuthorizationResponse;
+import org.apache.manifoldcf.core.interfaces.CacheManagerFactory;
+import org.apache.manifoldcf.core.interfaces.ConfigParams;
+import org.apache.manifoldcf.core.interfaces.ICacheCreateHandle;
+import org.apache.manifoldcf.core.interfaces.ICacheDescription;
+import org.apache.manifoldcf.core.interfaces.ICacheHandle;
+import org.apache.manifoldcf.core.interfaces.ICacheManager;
+import org.apache.manifoldcf.core.interfaces.IHTTPOutput;
+import org.apache.manifoldcf.core.interfaces.IPostParameters;
+import org.apache.manifoldcf.core.interfaces.IThreadContext;
+import org.apache.manifoldcf.core.interfaces.ManifoldCFException;
+import org.apache.manifoldcf.core.interfaces.StringSet;
+import org.apache.manifoldcf.crawler.connectors.box.BoxSession;
+import org.apache.manifoldcf.crawler.system.Logging;
+import org.apache.manifoldcf.ui.util.Encoder;
+import org.json.JSONArray;
+import org.json.JSONException;
+import org.json.JSONObject;
+
+import com.box.sdk.BoxAPIConnection;
+import com.box.sdk.BoxAPIException;
+import com.box.sdk.BoxUser;
 
 /**
  * This is the box authority implementation, which simply returns the user name
@@ -55,6 +67,9 @@ public class BoxAuthority extends
 	public static final String USER_PERMISSION_TYPE = "user";
 	public static final String USER_LOGIN_EMAIL = "loginMail";
 	public static final String GROUP_PERMISSION_TYPE = "group";
+	public static final Pattern VALID_EMAIL_ADDRESS_REGEX = Pattern.compile(
+			"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$",
+			Pattern.CASE_INSENSITIVE);
 
 	public int apiResponseCode = 400;
 
@@ -332,15 +347,31 @@ public class BoxAuthority extends
 		}
 		try {
 			Logging.connectors.info("Getting the user id from box api");
-			UserInfo boxUserInfo = getBoxUserId(userName);
-			if (boxUserInfo != null && boxUserInfo.getUserId() != null && !boxUserInfo.getUserId().isEmpty()) {
-				tokens.add(USER_PERMISSION_TYPE + "-" + boxUserInfo.getUserId());
-				tokens.add(USER_LOGIN_EMAIL + "-" + URLDecoder.decode(boxUserInfo.getLogin()));
-				Logging.connectors.info(String.format("User id is : %s, getting memberships....", boxUserInfo.getUserId() ));
+			
+			//check if email
+			boolean isEmailAdded = false;
+			boolean isInputEmail = validate(userName);
+			if (isInputEmail) {
+				tokens.add(USER_LOGIN_EMAIL + "-" + userName);
+				isEmailAdded = true;
 			}
 			
-			if (boxUserInfo != null && StringUtils.isNotEmpty(boxUserInfo.getUserId())) {
-				ArrayList<String> memberShips = getMemberShips(boxUserInfo.getUserId());
+			
+			UserInfo boxUserInfo = getBoxUserId(userName);
+			if (boxUserInfo != null && boxUserInfo.getUserId() != null
+					&& !boxUserInfo.getUserId().isEmpty()) {
+				tokens.add(USER_PERMISSION_TYPE + "-" + boxUserInfo.getUserId());		
+				if(!isEmailAdded)
+					tokens.add(USER_LOGIN_EMAIL + "-" + boxUserInfo.getLogin());
+				Logging.connectors.info(String.format(
+						"User id is : %s, getting memberships....",
+						boxUserInfo.getUserId()));
+			}
+
+			if (boxUserInfo != null
+					&& StringUtils.isNotEmpty(boxUserInfo.getUserId())) {
+				ArrayList<String> memberShips = getMemberShips(boxUserInfo
+						.getUserId());
 				if (memberShips != null) {
 					Logging.connectors.info(String.format(
 							"There are %s, groups returned for user name %s",
@@ -351,6 +382,14 @@ public class BoxAuthority extends
 							AuthorizationResponse.RESPONSE_OK);
 				}
 			}
+			
+			
+			//return authorized token if a single email is added even
+			if (isEmailAdded) {
+				return new AuthorizationResponse(
+						tokens.toArray(new String[tokens.size()]),
+						AuthorizationResponse.RESPONSE_OK);
+			}
 
 		} catch (ClientProtocolException e) {
 			throw new ManifoldCFException(e.getCause());
@@ -360,6 +399,11 @@ public class BoxAuthority extends
 
 		return new AuthorizationResponse(tokens.toArray(new String[tokens
 				.size()]), AuthorizationResponse.RESPONSE_USERUNAUTHORIZED);
+	}
+
+	public boolean validate(String emailStr) {
+		Matcher matcher = VALID_EMAIL_ADDRESS_REGEX.matcher(emailStr);
+		return matcher.find();
 	}
 
 	private ArrayList<String> getMemberShips(String userId)
