@@ -43,8 +43,10 @@ public class ImageFeatureExtractor extends BaseTransformationConnector
     private static final String IMG_SIFT = "img:sift";
     private static final String IMG_COLOR = "img:color";
     private static final String IMG_STATUS = "img:status";
+    private static final String IS_IMAGE = "img:valid";
 
     private static final String IMG_STATUS_UNPROCESSED = "UNPROCESSED";
+    private static final String DEFAULT_IS_IMG = "true";
 
     protected static final String ACTIVITY_EXTRACT = "extract";
 
@@ -164,6 +166,7 @@ public class ImageFeatureExtractor extends BaseTransformationConnector
                 String colorText = colorExtractor.extractColor(new ByteArrayInputStream(bytes));
                 metadata.add(IMG_COLOR, colorText);
                 metadata.add(IMG_STATUS, IMG_STATUS_UNPROCESSED);
+                metadata.add(IS_IMAGE, DEFAULT_IS_IMG);
 
                 // mapping with configuration definition
                 String[] metaNames = metadata.names();
