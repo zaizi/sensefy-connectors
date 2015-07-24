@@ -297,7 +297,7 @@
 
 		<dependency>
 			<groupId>com.zaizi.sensefy</groupId>
-			<artifactId>cbir.feature.extreact</artifactId>
+			<artifactId>cbir.feature.extract</artifactId>
 			<version>0.1</version>
 		</dependency>
 
