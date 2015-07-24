@@ -34,18 +34,13 @@ import org.apache.stanbol.client.enhancer.model.EntityAnnotation;
 import org.apache.stanbol.client.enhancer.model.TextAnnotation;
 import org.apache.stanbol.client.entityhub.model.Entity;
 import org.apache.stanbol.client.impl.StanbolClientImpl;
-import org.apache.tika.exception.TikaException;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.xml.sax.SAXException;
 
-import com.google.common.base.Function;
-import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
-import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 
@@ -208,7 +203,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             RepositoryDocument document, String authorityNameString, IOutputAddActivity activities)
             throws ManifoldCFException, ServiceInterruption, IOException
     {
-        Logging.root.error("Inside Stanbol enhancer..");
+        Logging.agents.error("Inside Stanbol enhancer..");
         long startTime = System.currentTimeMillis();
         String resultCode = "OK";
         String description = null;
@@ -228,32 +223,10 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         List<String> entitiesTypesJSONs = Lists.newArrayList();
 
         EnhancementResult enhancerResult = null;
-        // StanbolClientFactory stanbolFactory = new StanbolClientFactory(STANBOL_ENDPOINT);
-        // Enhancer stanbolClient = stanbolFactory.createEnhancerClient();
-        // EnhancerParameters params = EnhancerParameters.builder().buildDefault(sample);
-        // EnhancementStructure enhancerResult = null;
-        // try
-        // {
-        // enhancerResult = stanbolClient.enhance(params);
-        // Collection<TextAnnotation> textAnnotations = enhancerResult.getTextAnnotations();
-        // for (TextAnnotation ta : textAnnotations)
-        // {
-        // Logging.agents.info("New text annotation");
-        // Logging.agents.info("Selection Context: " + ta.getSelectionContext());
-        // Logging.agents.info("Selected Text: " + ta.getSelectedText());
-        // Logging.agents.info("Engine: " + ta.getCreator());
-        // Logging.agents.info("Candidates: ");
-        // for (EntityAnnotation ea : enhancerResult.getEntityAnnotations(ta))
-        // {
-        // Logging.agents.info("\t" + ea.getEntityLabel() + " - " + ea.getEntityReference());
-        // }
-        //
-        // }
-        //
-        // }
+        StanbolClient stanbolClient = null;
         try
         {
-            StanbolClient stanbolClient = new StanbolClientImpl(STANBOL_ENDPOINT);
+            stanbolClient = new StanbolClientImpl(STANBOL_ENDPOINT);
             Logging.agents.info("Going to enhance sample : " + sample);
             // enhancing content
             enhancerResult = stanbolClient.enhancer().enhance(null, sample);
@@ -346,70 +319,6 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                             entitiesJsons.add(nextEntityJSONArray.toString()); // we need the array
                         }
 
-                        // // SMLT Annotations
-                        // Multimap<String, String> types = helper.getTypesLabels();
-                        // if (types.isEmpty())
-                        // {
-                        // Collection<String> unlabelledTypes = helper.getTypes();
-                        // for (String type : unlabelledTypes)
-                        // types.put(type, RedLinkLDPathConfig.getLocalName(type));
-                        // }
-
-                        // // Entity Type JSONs
-                        // for (String typeURI : types.keySet())
-                        // if (!entityTypes.contains(typeURI))
-                        // {
-                        // entityTypes.add(typeURI);
-                        // JSONArray nextEntityTypeJSONArray = new JSONArray();
-                        // JSONObject nextEntityTypeJSON = new JSONObject();
-                        // nextEntityTypeJSONArray.put(nextEntityTypeJSON);
-                        // try
-                        // {
-                        // nextEntityTypeJSON.put(ENTITY_INDEX_ID_FIELD, typeURI);
-                        // JSONObject occur = new JSONObject();
-                        // occur.put("inc", 1);
-                        // nextEntityTypeJSON.put(OCCURRENCES_FIELD, occur);
-                        //
-                        // // Multilanguage Labels
-                        // // Collection<String> labels = types.get(typeURI);
-                        // // nextEntityTypeJSON.put(TYPE_FIELD, labels);
-                        //
-                        // // Hierarchy
-                        //
-                        // // Collection<String> hierarchy = helper.getHierarchy().get(typeURI);
-                        // // nextEntityTypeJSON.put(HIERARCHY_FIELD, hierarchy);
-                        //
-                        // // Attributes
-                        // Collection<String> propertiesURIs = helper.getAllPropertiesValues().keySet();
-                        // nextEntityTypeJSON.put(
-                        // ATTRIBUTES_FIELD,
-                        // FluentIterable.from(propertiesURIs).transform(
-                        // new Function<String, String>()
-                        // {
-                        // @Override
-                        // public String apply(String input)
-                        // {
-                        // return RedLinkLDPathConfig.getLocalName(input);
-                        // }
-                        // }));
-                        //
-                        // entitiesTypesJSONs.add(nextEntityTypeJSONArray.toString());
-                        //
-                        // }
-                        // catch (JSONException e)
-                        // {
-                        // Logging.connectors.error(
-                        // "Error creating Entity Type Document with URI: " + typeURI, e);
-                        // continue; // Continue with next Entity Type
-                        // }
-                        //
-                        // }
-                        // for(String val : propValues){
-                        // System.out.println("prop : " + prop + " value :" + val);
-                        //
-                        //
-                        // }
-
                     }
 
                 }
@@ -427,8 +336,10 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         }
         finally
         {
+            
             activities.recordActivity(new Long(startTime), ACTIVITY_ENHANCE, length, documentURI, resultCode,
                     description);
+            
         }
 
         if (enhancerResult == null)
@@ -749,163 +660,10 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         paramMap.put("IGNORETIKAEXCEPTIONS", ignoreTikaExceptions);
     }
 
-    protected static int handleTikaException(TikaException e) throws IOException, ManifoldCFException,
-            ServiceInterruption
-    {
-        // MHL - what does Tika throw if it gets an IOException reading the stream??
-        Logging.ingest.warn("Tika: Tika exception extracting: " + e.getMessage(), e);
-        return DOCUMENTSTATUS_REJECTED;
-    }
+   
 
-    protected static int handleSaxException(SAXException e) throws IOException, ManifoldCFException,
-            ServiceInterruption
-    {
-        // MHL - what does this mean?
-        Logging.ingest.warn("Tika: SAX exception extracting: " + e.getMessage(), e);
-        return DOCUMENTSTATUS_REJECTED;
-    }
-
-    protected static int handleIOException(IOException e) throws ManifoldCFException
-    {
-        // IOException reading from our local storage...
-        if (e instanceof InterruptedIOException)
-            throw new ManifoldCFException(e.getMessage(), e, ManifoldCFException.INTERRUPTED);
-        throw new ManifoldCFException(e.getMessage(), e);
-    }
-
-    protected static interface DestinationStorage
-    {
-        /**
-         * Get the output stream to write to. Caller should explicitly close this stream when done writing.
-         */
-        public OutputStream getOutputStream() throws ManifoldCFException;
-
-        /**
-         * Get new binary length.
-         */
-        public long getBinaryLength() throws ManifoldCFException;
-
-        /**
-         * Get the input stream to read from. Caller should explicitly close this stream when done reading.
-         */
-        public InputStream getInputStream() throws ManifoldCFException;
-
-        /**
-         * Close the object and clean up everything. This should be called when the data is no longer needed.
-         */
-        public void close() throws ManifoldCFException;
-    }
-
-    protected static class FileDestinationStorage implements DestinationStorage
-    {
-        protected final File outputFile;
-        protected final OutputStream outputStream;
-
-        public FileDestinationStorage() throws ManifoldCFException
-        {
-            File outputFile;
-            OutputStream outputStream;
-            try
-            {
-                outputFile = File.createTempFile("mcftika", "tmp");
-                outputStream = new FileOutputStream(outputFile);
-            }
-            catch (IOException e)
-            {
-                handleIOException(e);
-                outputFile = null;
-                outputStream = null;
-            }
-            this.outputFile = outputFile;
-            this.outputStream = outputStream;
-        }
-
-        @Override
-        public OutputStream getOutputStream() throws ManifoldCFException
-        {
-            return outputStream;
-        }
-
-        /**
-         * Get new binary length.
-         */
-        @Override
-        public long getBinaryLength() throws ManifoldCFException
-        {
-            return outputFile.length();
-        }
-
-        /**
-         * Get the input stream to read from. Caller should explicitly close this stream when done reading.
-         */
-        @Override
-        public InputStream getInputStream() throws ManifoldCFException
-        {
-            try
-            {
-                return new FileInputStream(outputFile);
-            }
-            catch (IOException e)
-            {
-                handleIOException(e);
-                return null;
-            }
-        }
-
-        /**
-         * Close the object and clean up everything. This should be called when the data is no longer needed.
-         */
-        @Override
-        public void close() throws ManifoldCFException
-        {
-            outputFile.delete();
-        }
-
-    }
-
-    protected static class MemoryDestinationStorage implements DestinationStorage
-    {
-        protected final ByteArrayOutputStream outputStream;
-
-        public MemoryDestinationStorage(int sizeHint)
-        {
-            outputStream = new ByteArrayOutputStream(sizeHint);
-        }
-
-        @Override
-        public OutputStream getOutputStream() throws ManifoldCFException
-        {
-            return outputStream;
-        }
-
-        /**
-         * Get new binary length.
-         */
-        @Override
-        public long getBinaryLength() throws ManifoldCFException
-        {
-            return outputStream.size();
-        }
-
-        /**
-         * Get the input stream to read from. Caller should explicitly close this stream when done reading.
-         */
-        @Override
-        public InputStream getInputStream() throws ManifoldCFException
-        {
-            return new ByteArrayInputStream(outputStream.toByteArray());
-        }
-
-        /**
-         * Close the object and clean up everything. This should be called when the data is no longer needed.
-         */
-        public void close() throws ManifoldCFException
-        {
-        }
-
-    }
-
-    protected static class SpecPacker
+    
+      protected static class SpecPacker
     {
 
         private final Map<String, String> sourceTargets = new HashMap<String, String>();

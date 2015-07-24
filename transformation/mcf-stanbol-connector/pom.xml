@@ -193,7 +193,7 @@
 	  <artifactId>jackson-annotations</artifactId>
 	  <version>2.3.0</version>
     </dependency>
-    <dependency>
+    <!--dependency>
 	  <groupId>org.apache.tika</groupId>
 	  <artifactId>tika-core</artifactId>
 	  <version>1.5</version>
@@ -202,7 +202,7 @@
 	  <groupId>org.apache.tika</groupId>
 	  <artifactId>tika-parsers</artifactId>
 	  <version>1.5</version>
-    </dependency>
+    </dependency-->
     
     <!--custom dependencies-->
     <dependency>
