@@ -203,7 +203,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             RepositoryDocument document, String authorityNameString, IOutputAddActivity activities)
             throws ManifoldCFException, ServiceInterruption, IOException
     {
-        Logging.agents.error("Inside Stanbol enhancer..");
+        Logging.agents.info("Stanbol enhancer started..");
         long startTime = System.currentTimeMillis();
         String resultCode = "OK";
         String description = null;
@@ -224,6 +224,14 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
         EnhancementResult enhancerResult = null;
         StanbolClient stanbolClient = null;
+        
+        
+        //Create a copy of Repository Document       
+        RepositoryDocument docCopy = document.duplicate();
+        docCopy.setBinary(new ByteArrayInputStream(copy), length);
+        //Add Entities as properties to doc
+        docCopy.addField("hello", "world");
+
         try
         {
             stanbolClient = new StanbolClientImpl(STANBOL_ENDPOINT);
@@ -234,8 +242,8 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
             for (TextAnnotation ta : enhancerResult.getTextAnnotations())
             {
-                Logging.agents.info("Selected context : " + ta.getSelectionContext());
-                System.out.println("Selected text : " + ta.getSelectedText());
+                //Logging.agents.info("Selected context : " + ta.getSelectionContext());
+                Logging.agents.info("Selected text : " + ta.getSelectedText());
 
                 for (EntityAnnotation ea : enhancerResult.getEntityAnnotations(ta))
                 {
@@ -342,18 +350,16 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             
         }
 
+        
         if (enhancerResult == null)
         {
             return DOCUMENTSTATUS_REJECTED; // TODO Make This Configurable
         }
+        
 
         // Enrichment complete!
-        // Create a copy of Repository Document
-        RepositoryDocument docCopy = document.duplicate();
-        docCopy.setBinary(new ByteArrayInputStream(copy), length);
-
         // Add Entities JSONs
-        docCopy.addField(ENTITIES_FIELD, entitiesJsons.toArray(new String[entitiesJsons.size()]));
+        //docCopy.addField(ENTITIES_FIELD, entitiesJsons.toArray(new String[entitiesJsons.size()]));
 
         // // Add Semantic Metadata
         // docCopy.addField(FIELD_URIS, uris.toArray(new String[uris.size()]));
@@ -370,8 +376,6 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         // docCopy.addField(ENTITIES_TYPES_FIELD,
         // entitiesTypesJSONs.toArray(new String[entitiesTypesJSONs.size()]));
 
-        // Add Entities as properties to doc
-        docCopy.addField("hello", "world");
 
         // Send new document downstream
         int rval = activities.sendDocument(documentURI, docCopy);
