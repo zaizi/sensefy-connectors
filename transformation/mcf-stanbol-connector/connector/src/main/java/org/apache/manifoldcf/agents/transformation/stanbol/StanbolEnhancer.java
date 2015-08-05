@@ -23,24 +23,28 @@ import org.apache.commons.io.IOUtils;
 import org.apache.manifoldcf.core.interfaces.*;
 import org.apache.manifoldcf.agents.interfaces.*;
 import org.apache.manifoldcf.agents.system.Logging;
-import org.apache.manifoldcf.agents.transformation.stanbol.util.EntityComparator;
+import org.apache.stanbol.client.Enhancer;
+import org.apache.stanbol.client.EntityHub;
+import org.apache.stanbol.client.StanbolClientFactory;
+import org.apache.stanbol.client.enhancer.impl.EnhancerParameters;
+import org.apache.stanbol.client.enhancer.model.EnhancementStructure;
+import org.apache.stanbol.client.enhancer.model.EntityAnnotation;
+import org.apache.stanbol.client.enhancer.model.TextAnnotation;
+import org.apache.stanbol.client.entityhub.model.Entity;
 
 import java.io.*;
 import java.util.*;
 
-import org.apache.stanbol.client.StanbolClient;
-import org.apache.stanbol.client.enhancer.model.EnhancementResult;
-import org.apache.stanbol.client.enhancer.model.EntityAnnotation;
-import org.apache.stanbol.client.enhancer.model.TextAnnotation;
-import org.apache.stanbol.client.entityhub.model.Entity;
-import org.apache.stanbol.client.impl.StanbolClientImpl;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import com.google.common.base.Function;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
+import com.google.common.collect.Multimap;
 import com.google.common.collect.SetMultimap;
 import com.google.common.collect.Sets;
 
@@ -70,7 +74,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     static final String PARENT_URI_FIELD = "doc_ids";
     static final String OCCURRENCES_FIELD = "occurrences";
     static final String SMLT_ENTITY_TYPES_FIELD = "smlt_entity_types";
-    static final String FIELD_URIS = "smlt_entities";
+    static final String SMLT_ENTITY_URI_FIELD = "smlt_entities";
 
     public static final String TYPE_FIELD = "type";
 
@@ -85,6 +89,9 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             "http://rdf.freebase.com/ns/user");
 
     protected static final String[] activitiesList = new String[] { ACTIVITY_ENHANCE };
+    
+    private final StanbolClientFactory stanbolFactory = new StanbolClientFactory(STANBOL_ENDPOINT);
+    
 
     /**
      * Return a list of activities that this connector generates. The connector does NOT need to be connected before
@@ -203,49 +210,52 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             RepositoryDocument document, String authorityNameString, IOutputAddActivity activities)
             throws ManifoldCFException, ServiceInterruption, IOException
     {
-        Logging.agents.info("Stanbol enhancer started..");
+
+        System.out.println("Stanbol enhancer transformation connector started..");
         long startTime = System.currentTimeMillis();
         String resultCode = "OK";
         String description = null;
         // sample content request
-        String sample = "Testing Bruce Lee in America. Barak Obama is the president of USA.";
+        // String sample = "Testing Bruce Lee in America. Barak Obama is the president of USA.";
 
         // Extracting Content.
         long length = document.getBinaryLength();
         byte[] copy = IOUtils.toByteArray(document.getBinaryStream());
         String content = new String(copy);
-        System.out.println("Starting to enhance content : " + content);
 
         Set<String> uris = Sets.newHashSet();
         SetMultimap<String, String> properties = HashMultimap.create();
         Collection<String> entityTypes = Sets.newHashSet();
         List<String> entitiesJsons = Lists.newArrayList();
         List<String> entitiesTypesJSONs = Lists.newArrayList();
+        
+        Enhancer enhancerClient = null;
+        EnhancerParameters parameters = null;
+        EnhancementStructure eRes = null;
 
-        EnhancementResult enhancerResult = null;
-        StanbolClient stanbolClient = null;
-        
-        
-        //Create a copy of Repository Document       
+     
+        // Create a copy of Repository Document
         RepositoryDocument docCopy = document.duplicate();
         docCopy.setBinary(new ByteArrayInputStream(copy), length);
-        //Add Entities as properties to doc
+        // Add test property to doc
         docCopy.addField("hello", "world");
 
         try
         {
-            stanbolClient = new StanbolClientImpl(STANBOL_ENDPOINT);
-            Logging.agents.info("Going to enhance sample : " + sample);
+            Logging.agents.info("Starting to enhance document content : " + content);
+            
+            enhancerClient = stanbolFactory.createEnhancerClient();
+            parameters = EnhancerParameters.
+                        builder().
+                        buildDefault(content);
+            eRes = enhancerClient.enhance(parameters);
+            
+
             // enhancing content
-            enhancerResult = stanbolClient.enhancer().enhance(null, sample);
-            enhancerResult.disambiguate();
-
-            for (TextAnnotation ta : enhancerResult.getTextAnnotations())
+            for (TextAnnotation ta : eRes.getTextAnnotations())
             {
-                //Logging.agents.info("Selected context : " + ta.getSelectionContext());
-                Logging.agents.info("Selected text : " + ta.getSelectedText());
-
-                for (EntityAnnotation ea : enhancerResult.getEntityAnnotations(ta))
+                Logging.agents.info("Text annotation's selected text : " + ta.getSelectedText());
+                for (EntityAnnotation ea : eRes.getEntityAnnotations(ta))
                 {
                     JSONArray nextEntityJSONArray = new JSONArray();
                     JSONObject nextEntityJSON = new JSONObject();
@@ -265,6 +275,9 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                         nextEntityJSON.put(PARENT_URI_FIELD, parentURI);
                         nextEntityJSON.put(ENTITY_INDEX_ID_FIELD, ea.getEntityReference());
 
+                        // manually add some default properties for entities by dileepa
+                        nextEntityJSON.put("label", ea.getEntityLabel());
+
                     }
                     catch (JSONException e)
                     {
@@ -272,16 +285,21 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                         jsonFail = true;
                     }
 
-                    Logging.agents.info("Entity confidence : " + ea.getConfidence() + "Entity label : "
-                            + ea.getEntityLabel() + " ref : " + ea.getEntityReference());
+                    Logging.agents.info("Entity label : " + ea.getEntityLabel() + " ref uri : "
+                            + ea.getEntityReference());
 
-                    Entity entity = stanbolClient.entityhub().lookup(ea.getEntityReference(), true);
-                    List<String> labels = entity.getLabels();
+                    //Entity entity = client.entityhub().lookup(ea.getEntityReference(), true);
+                    EntityHub entityhubClient = stanbolFactory.createEntityHubClient();
+                    Entity entity = entityhubClient.lookup(ea.getEntityReference(), true);
+                    
+                    Collection<String> labels = entity.getLabels();
                     Logging.agents.info("entity uri: " + entity.getUri());
 
+                    // putting all the entity properties
                     for (String prop : entity.getProperties())
                     {
-                        List<String> propValues = entity.getPropertyValue(prop, false);
+                        //List<String> propValues = entity.getPropertyValue(prop, false);
+                        Collection<String> propValues = entity.getPropertyValues(prop);
                         properties.putAll(prop, propValues);
                         if (!jsonFail)
                         {
@@ -296,37 +314,94 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                 jsonFail = true;
                             }
                         }
+                    }
 
-                        // Positions
-                        if (!jsonFail)
+                    // Positions
+                    if (!jsonFail)
+                    {
+                        try
                         {
+                            JSONArray positions = new JSONArray();
+                            JSONObject posEntry = new JSONObject();
+                            posEntry.put("start", ta.getStart());
+                            posEntry.put("end", ta.getEnd());
+                            positions.put(posEntry);
+
+                            JSONObject ids2pos = new JSONObject();
+                            ids2pos.put(documentURI, positions);
+                            JSONObject addObject = new JSONObject();
+                            addObject.put("add", ids2pos.toString());
+                            nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
+                        }
+                        catch (JSONException e)
+                        {
+                            Logging.agents.error("Error creating Entity Document with URI: " + ea.getEntityReference(),
+                                    e);
+                            jsonFail = true;
+                        }
+                    }
+
+                    if (!jsonFail)
+                    {
+                        String entityJsonArray = nextEntityJSONArray.toString();
+                        entitiesJsons.add(entityJsonArray); // we need the array
+                        System.out.println("New entity object json : " + entityJsonArray);
+                    }
+
+                    // entity types
+                    Collection<String> types = entity.getTypes();
+                    // adding only the entity-type label;not the whole URI
+
+                    for (String typeURI : types)
+                    {
+                        if (!entityTypes.contains(typeURI))
+                        {
+                            entityTypes.add(typeURI);
+                            JSONArray nextEntityTypeJSONArray = new JSONArray();
+                            JSONObject nextEntityTypeJSON = new JSONObject();
+                            nextEntityTypeJSONArray.put(nextEntityTypeJSON);
                             try
                             {
-                                JSONArray positions = new JSONArray();
-                                JSONObject posEntry = new JSONObject();
-                                posEntry.put("start", ta.getStart());
-                                posEntry.put("end", ta.getEnd());
-                                positions.put(posEntry);
+                                nextEntityTypeJSON.put(ENTITY_INDEX_ID_FIELD, typeURI);
+                                JSONObject occur = new JSONObject();
+                                occur.put("inc", 1);
+                                nextEntityTypeJSON.put(OCCURRENCES_FIELD, occur);
 
-                                JSONObject ids2pos = new JSONObject();
-                                ids2pos.put(documentURI, positions);
-                                JSONObject addObject = new JSONObject();
-                                addObject.put("add", ids2pos.toString());
-                                nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
+                                // Multilanguage Labels
+                                // Collection<String> labels = types.get(typeURI);
+                                // nextEntityTypeJSON.put( TYPE_FIELD, labels);
+
+                                // need to put the label of the type;taken as a suggestion in search ui
+                                nextEntityTypeJSON.put(TYPE_FIELD, typeURI);
+
+                                // Hierarchy : no hierarchy implementation in Stanbol
+
+                                // Collection<String> hierarchy =
+                                // helper.getHierarchy().get(typeURI);
+                                // nextEntityTypeJSON.put( HIERARCHY_FIELD, hierarchy);
+
+                                // Attributes
+                                // Collection<String> propertiesURIs = helper.getAllPropertiesValues().keySet();
+                                // nextEntityTypeJSON.put( ATTRIBUTES_FIELD,
+                                // FluentIterable.
+                                // from(propertiesURIs).
+                                // transform(new Function<String, String>(){
+                                // @Override
+                                // public String apply(String input) {
+                                // return RedLinkLDPathConfig.getLocalName(input);
+                                // }
+                                // }));
+
+                                entitiesTypesJSONs.add(nextEntityTypeJSONArray.toString());
+
                             }
                             catch (JSONException e)
                             {
-                                Logging.agents.error(
-                                        "Error creating Entity Document with URI: " + ea.getEntityReference(), e);
-                                jsonFail = true;
+                                Logging.agents.error("Error creating Entity Type Document with URI: " + typeURI, e);
+                                continue; // Continue with next Entity Type
                             }
-                        }
 
-                        if (!jsonFail)
-                        {
-                            entitiesJsons.add(nextEntityJSONArray.toString()); // we need the array
                         }
-
                     }
 
                 }
@@ -344,38 +419,33 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         }
         finally
         {
-            
             activities.recordActivity(new Long(startTime), ACTIVITY_ENHANCE, length, documentURI, resultCode,
                     description);
-            
-        }
 
-        
-        if (enhancerResult == null)
+        }
+        if (eRes == null)
         {
             return DOCUMENTSTATUS_REJECTED; // TODO Make This Configurable
         }
-        
+
+        // printing the json array added to the entities filed of the repo doc
 
         // Enrichment complete!
         // Add Entities JSONs
-        //docCopy.addField(ENTITIES_FIELD, entitiesJsons.toArray(new String[entitiesJsons.size()]));
+        docCopy.addField(ENTITIES_FIELD, entitiesJsons.toArray(new String[entitiesJsons.size()]));
+        // Add Entities's types JSONs
+        docCopy.addField(ENTITIES_TYPES_FIELD, entitiesTypesJSONs.toArray(new String[entitiesTypesJSONs.size()]));
 
         // // Add Semantic Metadata
-        // docCopy.addField(FIELD_URIS, uris.toArray(new String[uris.size()]));
+        // these are flat fields/ no hierarchy
+        docCopy.addField(SMLT_ENTITY_URI_FIELD, uris.toArray(new String[uris.size()]));
         // for(String property:properties.keySet()){
         // Set<String> values = properties.get(property);
         // docCopy.addField(property,
         // values.toArray(new String[values.size()]));
         // }
 
-        // docCopy.addField(SMLT_ENTITY_TYPES_FIELD,
-        // entityTypes.toArray(new String[entityTypes.size()]));
-        //
-        // Add Entities's types JSONs
-        // docCopy.addField(ENTITIES_TYPES_FIELD,
-        // entitiesTypesJSONs.toArray(new String[entitiesTypesJSONs.size()]));
-
+        docCopy.addField(SMLT_ENTITY_TYPES_FIELD, entityTypes.toArray(new String[entityTypes.size()]));
 
         // Send new document downstream
         int rval = activities.sendDocument(documentURI, docCopy);
@@ -383,20 +453,260 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         return rval;
 
     }
+//    {
+//        System.out.println("Stanbol enhancer transformation connector started..");
+//        long startTime = System.currentTimeMillis();
+//        String resultCode = "OK";
+//        String description = null;
+//        // sample content request
+//        // String sample = "Testing Bruce Lee in America. Barak Obama is the president of USA.";
+//
+//        // Extracting Content.
+//        long length = document.getBinaryLength();
+//        byte[] copy = IOUtils.toByteArray(document.getBinaryStream());
+//        String content = new String(copy);
+//
+//        Set<String> uris = Sets.newHashSet();
+//        SetMultimap<String, String> properties = HashMultimap.create();
+//        Collection<String> entityTypes = Sets.newHashSet();
+//        List<String> entitiesJsons = Lists.newArrayList();
+//        List<String> entitiesTypesJSONs = Lists.newArrayList();
+//
+//        EnhancementResult enhancerResult = null;
+//        StanbolClient stanbolClient = null;
+//
+//        // Create a copy of Repository Document
+//        RepositoryDocument docCopy = document.duplicate();
+//        docCopy.setBinary(new ByteArrayInputStream(copy), length);
+//        // Add test property to doc
+//        docCopy.addField("hello", "world");
+//
+//        try
+//        {
+//            stanbolClient = new StanbolClientImpl(STANBOL_ENDPOINT);
+//            Logging.agents.info("Starting to enhance document content : " + content);
+//            // enhancing content
+//            enhancerResult = stanbolClient.enhancer().enhance(null, content);
+//            enhancerResult.disambiguate();
+//
+//            for (TextAnnotation ta : enhancerResult.getTextAnnotations())
+//            {
+//                Logging.agents.info("Text annotation's selected text : " + ta.getSelectedText());
+//                for (EntityAnnotation ea : enhancerResult.getEntityAnnotations(ta))
+//                {
+//                    JSONArray nextEntityJSONArray = new JSONArray();
+//                    JSONObject nextEntityJSON = new JSONObject();
+//                    nextEntityJSONArray.put(nextEntityJSON);
+//                    boolean jsonFail = false;
+//
+//                    uris.add(ea.getEntityReference());
+//                    // Parent Document + Ocurrence Counter
+//                    try
+//                    {
+//                        JSONObject occur = new JSONObject();
+//                        occur.put("inc", 1);
+//                        nextEntityJSON.put(OCCURRENCES_FIELD, occur);
+//
+//                        JSONObject parentURI = new JSONObject();
+//                        parentURI.put("add", documentURI);
+//                        nextEntityJSON.put(PARENT_URI_FIELD, parentURI);
+//                        nextEntityJSON.put(ENTITY_INDEX_ID_FIELD, ea.getEntityReference());
+//
+//                        // manually add some default properties for entities by dileepa
+//                        nextEntityJSON.put("label", ea.getEntityLabel());
+//
+//                    }
+//                    catch (JSONException e)
+//                    {
+//                        Logging.agents.error("Error creating Entity Document with URI: " + ea, e);
+//                        jsonFail = true;
+//                    }
+//
+//                    Logging.agents.info("Entity label : " + ea.getEntityLabel() + " ref uri : "
+//                            + ea.getEntityReference());
+//
+//                    Entity entity = stanbolClient.entityhub().lookup(ea.getEntityReference(), true);
+//                    List<String> labels = entity.getLabels();
+//                    Logging.agents.info("entity uri: " + entity.getUri());
+//
+//                    // putting all the entity properties
+//                    for (String prop : entity.getProperties())
+//                    {
+//                        List<String> propValues = entity.getPropertyValue(prop, false);
+//                        properties.putAll(prop, propValues);
+//                        if (!jsonFail)
+//                        {
+//                            try
+//                            {
+//                                nextEntityJSON.put(prop, propValues);
+//                            }
+//                            catch (JSONException e)
+//                            {
+//                                Logging.agents.error(
+//                                        "Error creating Entity Document with URI: " + ea.getEntityReference(), e);
+//                                jsonFail = true;
+//                            }
+//                        }
+//                    }
+//
+//                    // Positions
+//                    if (!jsonFail)
+//                    {
+//                        try
+//                        {
+//                            JSONArray positions = new JSONArray();
+//                            JSONObject posEntry = new JSONObject();
+//                            posEntry.put("start", ta.getStart());
+//                            posEntry.put("end", ta.getEnd());
+//                            positions.put(posEntry);
+//
+//                            JSONObject ids2pos = new JSONObject();
+//                            ids2pos.put(documentURI, positions);
+//                            JSONObject addObject = new JSONObject();
+//                            addObject.put("add", ids2pos.toString());
+//                            nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
+//                        }
+//                        catch (JSONException e)
+//                        {
+//                            Logging.agents.error("Error creating Entity Document with URI: " + ea.getEntityReference(),
+//                                    e);
+//                            jsonFail = true;
+//                        }
+//                    }
+//
+//                    if (!jsonFail)
+//                    {
+//                        String entityJsonArray = nextEntityJSONArray.toString();
+//                        entitiesJsons.add(entityJsonArray); // we need the array
+//                        System.out.println("New entity object json : " + entityJsonArray);
+//                    }
+//
+//                    
+//                    //entity types
+//                    List<String> types = entity.getTypes();
+//                    //adding only the entity-type label;not the whole URI
+//                    
+//                    for (String typeURI : types)
+//                    {
+//                        if (!entityTypes.contains(typeURI))
+//                        {
+//                            entityTypes.add(typeURI);
+//                            JSONArray nextEntityTypeJSONArray = new JSONArray();
+//                            JSONObject nextEntityTypeJSON = new JSONObject();
+//                            nextEntityTypeJSONArray.put(nextEntityTypeJSON);
+//                            try
+//                            {
+//                                nextEntityTypeJSON.put(ENTITY_INDEX_ID_FIELD, typeURI);
+//                                JSONObject occur = new JSONObject();
+//                                occur.put("inc", 1);
+//                                nextEntityTypeJSON.put(OCCURRENCES_FIELD, occur);
+//
+//                                // Multilanguage Labels
+//                                // Collection<String> labels = types.get(typeURI);
+//                                // nextEntityTypeJSON.put( TYPE_FIELD, labels);
+//                                
+//                                //need to put the label of the type;taken as a suggestion in search ui
+//                                nextEntityTypeJSON.put(TYPE_FIELD, typeURI);
+//
+//                                // Hierarchy : no hierarchy implementation in Stanbol
+//
+//                                // Collection<String> hierarchy =
+//                                // helper.getHierarchy().get(typeURI);
+//                                // nextEntityTypeJSON.put( HIERARCHY_FIELD, hierarchy);
+//
+//                                // Attributes
+//                                // Collection<String> propertiesURIs = helper.getAllPropertiesValues().keySet();
+//                                // nextEntityTypeJSON.put( ATTRIBUTES_FIELD,
+//                                // FluentIterable.
+//                                // from(propertiesURIs).
+//                                // transform(new Function<String, String>(){
+//                                // @Override
+//                                // public String apply(String input) {
+//                                // return RedLinkLDPathConfig.getLocalName(input);
+//                                // }
+//                                // }));
+//
+//                                entitiesTypesJSONs.add(nextEntityTypeJSONArray.toString());
+//
+//                            }
+//                            catch (JSONException e)
+//                            {
+//                                Logging.agents.error("Error creating Entity Type Document with URI: " + typeURI, e);
+//                                continue; // Continue with next Entity Type
+//                            }
+//
+//                        }
+//                    }
+//
+//                }
+//
+//            }
+//
+//        }
+//        catch (Exception e)
+//        {
+//            Logging.agents.error("Error occurred while performing Stanbol enhancement");
+//            resultCode = "STANBOL_ENHANCEMENT_FAIL";
+//            description = e.getMessage();
+//            Logging.agents.error("Error enhancing the document  : " + documentURI, e);
+//
+//        }
+//        finally
+//        {
+//
+//            activities.recordActivity(new Long(startTime), ACTIVITY_ENHANCE, length, documentURI, resultCode,
+//                    description);
+//
+//        }
+//
+//        if (enhancerResult == null)
+//        {
+//            return DOCUMENTSTATUS_REJECTED; // TODO Make This Configurable
+//        }
+//
+//        // printing the json array added to the entities filed of the repo doc
+//
+//        // Enrichment complete!
+//        // Add Entities JSONs
+//        docCopy.addField(ENTITIES_FIELD, entitiesJsons.toArray(new String[entitiesJsons.size()]));
+//        // Add Entities's types JSONs
+//        docCopy.addField(ENTITIES_TYPES_FIELD, entitiesTypesJSONs.toArray(new String[entitiesTypesJSONs.size()]));
+//
+//        
+//        // // Add Semantic Metadata
+//        // these are flat fields/ no hierarchy
+//        docCopy.addField(SMLT_ENTITY_URI_FIELD, uris.toArray(new String[uris.size()]));
+//        // for(String property:properties.keySet()){
+//        // Set<String> values = properties.get(property);
+//        // docCopy.addField(property,
+//        // values.toArray(new String[values.size()]));
+//        // }
+//
+//        docCopy.addField(SMLT_ENTITY_TYPES_FIELD, entityTypes.toArray(new String[entityTypes.size()]));
+//
+//        
+//        // Send new document downstream
+//        int rval = activities.sendDocument(documentURI, docCopy);
+//        resultCode = (rval == DOCUMENTSTATUS_ACCEPTED) ? "ACCEPTED" : "REJECTED";
+//        return rval;
+//
+//    }
 
     /**
      * not yet used..a local mechanism to disambiguate entitieannotations
      * 
      * @param entityAnnotations
      * @return
+     * 
+     * COMMENTED TO shift to latest version...change
      */
-    private EntityAnnotation getBestEntityAnnotation(List<EntityAnnotation> entityAnnotations)
-    {
-
-        EntityAnnotation[] entityAnnotationArray = entityAnnotations.toArray(new EntityAnnotation[entityAnnotations.size()]);
-        Arrays.sort(entityAnnotationArray, new EntityComparator());
-        return entityAnnotationArray[0];
-    }
+//    private EntityAnnotation getBestEntityAnnotation(List<EntityAnnotation> entityAnnotations)
+//    {
+//
+//        EntityAnnotation[] entityAnnotationArray = entityAnnotations.toArray(new EntityAnnotation[entityAnnotations.size()]);
+//        Arrays.sort(entityAnnotationArray, new EntityComparator());
+//        return entityAnnotationArray[0];
+//    }
 
     /**
      * Obtain the name of the form check javascript method to call.
@@ -664,10 +974,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         paramMap.put("IGNORETIKAEXCEPTIONS", ignoreTikaExceptions);
     }
 
-   
-
-    
-      protected static class SpecPacker
+    protected static class SpecPacker
     {
 
         private final Map<String, String> sourceTargets = new HashMap<String, String>();
