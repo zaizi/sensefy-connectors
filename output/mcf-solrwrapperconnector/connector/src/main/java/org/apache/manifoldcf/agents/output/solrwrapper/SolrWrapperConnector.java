@@ -53,6 +53,7 @@ import org.json.JSONArray;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -222,8 +223,8 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
         Map<IndexNames, IOutputConnection> index2connector = this.getConnectors();
         IOutputConnection iOutputConnection = index2connector.get(IndexNames.PRIMARY_INDEX);
         IOutputConnectorPool outputConnectorPool = OutputConnectorPoolFactory.make(super.currentContext);
-        BaseOutputConnector outputConnector = (BaseOutputConnector)outputConnectorPool.grab(iOutputConnection);
-        outputDescription =outputConnector.getOutputDescription( spec );
+        BaseOutputConnector outputConnector = (BaseOutputConnector) outputConnectorPool.grab(iOutputConnection);
+        outputDescription = outputConnector.getOutputDescription(spec);
         outputConnectorPool.release(iOutputConnection, outputConnector);
 
         return outputDescription;
@@ -254,9 +255,9 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
         List<IndexNames> orderedIndexList = getOrderedIndexes();
         IOutputConnectorPool outputConnectorPool = null;
         outputConnectorPool = OutputConnectorPoolFactory.make(super.currentContext);
-        //Primary Index Connector
+        // Primary Index Connector
         IOutputConnection primaryConnection = index2connector.get(IndexNames.PRIMARY_INDEX);
-        BaseOutputConnector primaryConnector = (BaseOutputConnector)outputConnectorPool.grab(primaryConnection);
+        BaseOutputConnector primaryConnector = (BaseOutputConnector) outputConnectorPool.grab(primaryConnection);
 
         for (IndexNames index : orderedIndexList)
         {
@@ -265,7 +266,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
 
             try
             {
-                outputConnector = (BaseOutputConnector)outputConnectorPool.grab(outputConnection);
+                outputConnector = (BaseOutputConnector) outputConnectorPool.grab(outputConnection);
             }
             catch (ManifoldCFException e)
             {
@@ -276,9 +277,10 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
             switch (index)
             {
             case ENTITY_INDEX:
-                removeChildren( documentURI, outputDescription,primaryConnector, outputConnector ,SMLT_ENTITIES,true);
+                removeChildren(documentURI, outputDescription, primaryConnector, outputConnector, SMLT_ENTITIES, true);
             case ENTITY_TYPE_INDEX:
-                 removeChildren( documentURI, outputDescription,primaryConnector, outputConnector ,SMLT_ENTITY_TYPES,false);
+                removeChildren(documentURI, outputDescription, primaryConnector, outputConnector, SMLT_ENTITY_TYPES,
+                        false);
 
             }
             outputConnectorPool.release(outputConnection, outputConnector);
@@ -288,46 +290,49 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
         primaryConnector.removeDocument(documentURI, outputDescription, activities);
         outputConnectorPool.release(primaryConnection, primaryConnector);
 
-        activities.recordActivity( null, REMOVE_ACTIVITY, null, documentURI, "OK", null );
+        activities.recordActivity(null, REMOVE_ACTIVITY, null, documentURI, "OK", null);
     }
 
     /**
      * We have to proceed first with the removal of children and then with removal of primary document
+     * 
      * @return
      */
     private List<IndexNames> getOrderedIndexes()
     {
-        List<IndexNames> orderedIndexList=new ArrayList<IndexNames>();
-        orderedIndexList.add( IndexNames.ENTITY_TYPE_INDEX );
-        orderedIndexList.add( IndexNames.ENTITY_INDEX );
+        List<IndexNames> orderedIndexList = new ArrayList<IndexNames>();
+        orderedIndexList.add(IndexNames.ENTITY_TYPE_INDEX);
+        orderedIndexList.add(IndexNames.ENTITY_INDEX);
         return orderedIndexList;
     }
 
     /**
-     * Removes the children of the current primaryDocument .
-     * To retrieve the children entities we use the primaryIndex Connector as those information are in the primaryIndex independently of which index
-     * are we going to purge.
+     * Removes the children of the current primaryDocument . To retrieve the children entities we use the primaryIndex
+     * Connector as those information are in the primaryIndex independently of which index are we going to purge.
+     * 
      * @param documentURI
      * @param outputDescription
      * @param outputConnector
      * @param childType
      */
-    private void removeChildren( String documentURI, String outputDescription,BaseOutputConnector primaryIndexConnector, BaseOutputConnector outputConnector,String childType,boolean removeDocURI)
+    private void removeChildren(String documentURI, String outputDescription,
+            BaseOutputConnector primaryIndexConnector, BaseOutputConnector outputConnector, String childType,
+            boolean removeDocURI)
     {
         List<String> childrenEntities;
         childrenEntities = this.retrieveChildrenFromSolr(documentURI, primaryIndexConnector.getConfiguration(),
-                                                         childType );
+                childType);
 
-        for (String currentId:childrenEntities)
+        for (String currentId : childrenEntities)
         {
             try
             {
-                JSONArray removalUpdateJSON = JSONRepositoryDocumentSerializer.createAtomicRemovalJSON( currentId,
-                                                                                                        documentURI,
-                                                                                                        removeDocURI );
+                JSONArray removalUpdateJSON = JSONRepositoryDocumentSerializer.createAtomicRemovalJSON(currentId,
+                        documentURI, removeDocURI);
                 RepositoryDocument removalUpdateRepoDoc = JSONRepositoryDocumentSerializer.createRepoDocFromJSON(
-                    currentId, removalUpdateJSON.toString() );
-                outputConnector.addOrReplaceDocument(currentId,outputDescription, removalUpdateRepoDoc,
+                        currentId, removalUpdateJSON.toString());
+                
+                outputConnector.addOrReplaceDocument(currentId, outputDescription, removalUpdateRepoDoc,
                         "authorityNameString", new EmptyOutputAddActivity()); // check the authorityNameString
             }
             catch (Exception e)
@@ -340,7 +345,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
 
     /**
      * Returns from the Entity core all the children entities of a specific primary document
-     *
+     * 
      * ATTENTION : This can be improved accessing with GET only the documentURI doc, then retrieving or entity types or
      * entities ID ( that are there with SMLT fields)
      * 
@@ -348,26 +353,27 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      * @param configuration
      * @return
      */
-    private List<String> retrieveChildrenFromSolr(String documentURI, ConfigParams configuration,String field)
+    private List<String> retrieveChildrenFromSolr(String documentURI, ConfigParams configuration, String field)
     {
         QueryResponse getResponse;
         SolrQuery getQuery;
-        List<String> childrenIds=new ArrayList<String>();
+        List<String> childrenIds = new ArrayList<String>();
         SolrDocumentList results = new SolrDocumentList();
 
         HttpSolrServer solrServer = getHttpSolrServer(configuration);
 
-        getQuery= new SolrQuery();
-        getQuery.setRequestHandler( "/get" );
-        getQuery.set( "ids", documentURI );
+        getQuery = new SolrQuery();
+        getQuery.setRequestHandler("/get");
+        getQuery.set("ids", documentURI);
 
         try
         {
-            getResponse = solrServer.query( getQuery );
+            getResponse = solrServer.query(getQuery);
             results = getResponse.getResults();
-            if(results.size()>0)  {
-                SolrDocument d = results.get( 0 );
-                childrenIds=(List<String>) d.getFieldValue( field );
+            if (results.size() > 0)
+            {
+                SolrDocument d = results.get(0);
+                childrenIds = (List<String>) d.getFieldValue(field);
             }
 
         }
@@ -424,14 +430,12 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
     {
         boolean documentAcceptance = true;
         Logging.connectors.info("SolrWrapper - Starting Semantic Info Indexing" + documentURI);
-
         Map<IndexNames, IOutputConnection> index2connector = this.getConnectors();
         Map<IndexNames, List<RepositoryDocument>> index2documents = JSONRepositoryDocumentSerializer.parseJSONChildStructures(
                 documentURI, document);
 
         for (IndexNames index : index2connector.keySet())
         {
-            //
             IOutputConnection outputConnection = index2connector.get(index);
 
             IOutputConnectorPool outputConnectorPool = null;
@@ -439,7 +443,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
             try
             {
                 outputConnectorPool = OutputConnectorPoolFactory.make(super.currentContext);
-                outputConnector = (BaseOutputConnector)outputConnectorPool.grab(outputConnection);
+                outputConnector = (BaseOutputConnector) outputConnectorPool.grab(outputConnection);
             }
             catch (ManifoldCFException e)
             {
@@ -448,26 +452,23 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
             }
 
             List<RepositoryDocument> repositoryDocuments = index2documents.get(index);
-            if (repositoryDocuments != null)
-
+            
+            //check if the document being indexed is the primary document if yes, 
+            //send it with the documentURI passed to SolrWrapper as id
+            if (index == IndexNames.PRIMARY_INDEX)
             {
-                for (RepositoryDocument d : repositoryDocuments)
+                if (repositoryDocuments != null)
                 {
-
+                    RepositoryDocument d = repositoryDocuments.get(0);
                     try
                     {
-                        String id="";
-                        if(d.getFieldAsStrings(DOCUMENT_ID_FIELD)!=null)
-                             id = d.getFieldAsStrings(DOCUMENT_ID_FIELD)[0];
-                        if(d.getFieldAsStrings( PRIMARY_DOCUMENT_URI )!=null)
-                            id = d.getFieldAsStrings("uri")[0];
-
-                        int acceptance=outputConnector.addOrReplaceDocument(id, outputDescription, d, authorityNameString,
-                                activities);
-                        if(acceptance==DOCUMENTSTATUS_REJECTED)
-                            Logging.connectors.error( "Error Ingesting Child Document : Rejected - "+id );
+                        Logging.connectors.info("\n the repo doc being proccessed by Solrwrapper : " + documentURI);
+                        int acceptance = outputConnector.addOrReplaceDocument(documentURI, outputDescription, d,
+                                authorityNameString, activities);
+                        if (acceptance == DOCUMENTSTATUS_REJECTED)
+                            Logging.connectors.error("Error Ingesting Child Document : Rejected 468- " + documentURI);
                         else
-                            Logging.connectors.info( " Child Document : Accepted - "+id );
+                            Logging.connectors.info(" Child Document : Accepted - " + documentURI);
                     }
                     catch (Exception e)
                     {
@@ -475,9 +476,38 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
                                 + " for Parent Document :" + documentURI, e);
                         continue;
                     }
+
                 }
             }
-
+            else
+            {//documents from entity,entityType indexes
+                if (repositoryDocuments != null)
+                {
+                    for (RepositoryDocument d : repositoryDocuments)
+                    {
+                        try
+                        {
+                            String id = "";
+                            if (d.getFieldAsStrings(DOCUMENT_ID_FIELD) != null)
+                                id = d.getFieldAsStrings(DOCUMENT_ID_FIELD)[0];
+                            Logging.connectors.info("\n the repo doc being proccessed by Solrwrapper : " + id);
+                            int acceptance = outputConnector.addOrReplaceDocument(id, outputDescription, d,
+                                    authorityNameString, activities);
+                            if (acceptance == DOCUMENTSTATUS_REJECTED)
+                                Logging.connectors.error("Error Ingesting Child Document : Rejected 468- " + id);
+                            else
+                                Logging.connectors.info(" Child Document : Accepted - " + id);
+                        }
+                        catch (Exception e)
+                        {
+                            Logging.connectors.error("Error in adding documents in the Index :  " + index
+                                    + " for Parent Document :" + documentURI, e);
+                            continue;
+                        }
+                    }
+                }
+            }
+            
             outputConnectorPool.release(outputConnection, outputConnector);
         }
         activities.recordActivity(null, INGEST_ACTIVITY, new Long(document.getBinaryLength()), documentURI, "OK", null);
@@ -506,7 +536,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
             outputConnector.noteJobComplete(activities);
             try
             {
-                if(index!=IndexNames.PRIMARY_INDEX)
+                if (index != IndexNames.PRIMARY_INDEX)
                     this.removeEmptyOccurrences(outputConnector.getConfiguration());
             }
             catch (Exception e)
