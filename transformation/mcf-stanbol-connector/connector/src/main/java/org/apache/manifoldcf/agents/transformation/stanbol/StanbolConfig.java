@@ -22,17 +22,17 @@ package org.apache.manifoldcf.agents.transformation.stanbol;
 
 /** Parameters for Tika transformation connector.
  */
-public class TikaConfig {
+public class StanbolConfig {
 
   // Configuration parameters
   // None
 
   // Specification nodes and values
-  public static final String NODE_FIELDMAP = "fieldmap";
-  public static final String NODE_KEEPMETADATA = "keepAllMetadata";
-  public static final String NODE_IGNORETIKAEXCEPTION = "ignoreException";
-  public static final String ATTRIBUTE_SOURCE = "source";
-  public static final String ATTRIBUTE_TARGET = "target";
-  public static final String ATTRIBUTE_VALUE = "value";
+  public static final String ATTRIBUTE_VALUE = "value"; 
+  public static final String STANBOL_SERVER_VALUE = "stanbol_server";
+  public static final String STANBOL_CHAIN_VALUE = "stanbol_chain";
+  
+  
+  
   
 }
