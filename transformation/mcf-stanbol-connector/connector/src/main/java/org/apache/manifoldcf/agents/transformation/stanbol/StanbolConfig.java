@@ -20,7 +20,8 @@ package org.apache.manifoldcf.agents.transformation.stanbol;
 */
 
 
-/** Parameters for Tika transformation connector.
+/**
+ * @author Dileepa Jayakody <djayakody@zaizi.com>
  */
 public class StanbolConfig {
 

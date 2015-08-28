@@ -1,7 +1,5 @@
 package org.apache.manifoldcf.agents.transformation.stanbol;
 
-/* $Id: TikaExtractor.java 1612814 2014-07-23 11:50:59Z kwright $ */
-
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements. See the NOTICE file distributed with
@@ -41,8 +39,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * This connector works as a transformation connector, but does nothing other than logging.
- * 
+ * Stanbol Enhancer transformation connector 
+ * @author Dileepa Jayakody <djayakody@zaizi.com>
  */
 public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation.BaseTransformationConnector
 {
@@ -65,6 +63,10 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     static final String OCCURRENCES_FIELD = "occurrences";
     static final String SMLT_ENTITY_TYPES_FIELD = "smlt_entity_types";
     static final String SMLT_ENTITY_URI_FIELD = "smlt_entities";
+
+    static final String PERSON_TYPE_FIELD = "has_person";
+    static final String ORGANIZATION_TYPE_FIELD = "has_organization";
+    static final String PLACE_TYPE_FIELD = "has_place";
 
     public static final String TYPE_FIELD = "type";
     public static final String LABEL_FIELD = "label";
@@ -268,6 +270,10 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         }
         else
         {
+            boolean hasPersonTypeEntities = false;
+            boolean hasOrganizationTypeEntities = false;
+            boolean hasPlaceTypeEntities = false;
+            
             for (TextAnnotation ta : eRes.getTextAnnotations())
             {
                 //need to disambiguate the eas returned
@@ -352,6 +358,19 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                             // need to put the label of the type;taken as a suggestion in search ui
                                             String typeLabel = this.getTypeLiteral(typeURI);
                                             typeLabels.add(typeLabel);
+                                            
+                                            if(typeLabel.equalsIgnoreCase(PERSON_ENTITY_ATTRIBUTE_VALUE))
+                                            {
+                                                hasPersonTypeEntities = true;
+                                                
+                                            } else if(typeLabel.equalsIgnoreCase(ORGANIZATION_ENTITY_ATTRIBUTE_VALUE))
+                                            {
+                                                hasOrganizationTypeEntities = true;
+                                                
+                                            } else if(typeLabel.equalsIgnoreCase(PLACE_ENTITY_ATTRIBUTE_VALUE))
+                                            {
+                                                hasPlaceTypeEntities = true;
+                                            }
 
                                             nextEntityTypeJSON.put(TYPE_FIELD, typeLabel);
 
@@ -446,8 +465,13 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             // these are flat fields/ no hierarchy
             docCopy.addField(SMLT_ENTITY_URI_FIELD, uris.toArray(new String[uris.size()]));
             docCopy.addField(SMLT_ENTITY_TYPES_FIELD, entityTypes.toArray(new String[entityTypes.size()]));
+            
+            //tagging the primary document whether it has person, org, place type entities
+            docCopy.addField(PERSON_TYPE_FIELD, Boolean.toString(hasPersonTypeEntities));
+            docCopy.addField(ORGANIZATION_TYPE_FIELD, Boolean.toString(hasOrganizationTypeEntities));
+            docCopy.addField(PLACE_TYPE_FIELD, Boolean.toString(hasPlaceTypeEntities));
         }
-
+        
         // Send new document downstream
         int rval = activities.sendDocument(documentURI, docCopy);
         resultCode = (rval == DOCUMENTSTATUS_ACCEPTED) ? "ACCEPTED" : "REJECTED";

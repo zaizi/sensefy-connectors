@@ -4,6 +4,9 @@ import java.util.Comparator;
 
 import org.apache.stanbol.client.enhancer.model.EntityAnnotation;
 
+/**
+ * @author Dileepa Jayakody <djayakody@zaizi.com>
+ */
 public class EntityComparator implements Comparator<EntityAnnotation>
 {
     @Override

@@ -1,7 +1,5 @@
 package org.apache.manifoldcf.agents.transformation.stanbol;
 
-/* $Id: Messages.java 1596720 2014-05-22 00:57:29Z kwright $ */
-
 /**
 * Licensed to the Apache Software Foundation (ASF) under one or more
 * contributor license agreements. See the NOTICE file distributed with
