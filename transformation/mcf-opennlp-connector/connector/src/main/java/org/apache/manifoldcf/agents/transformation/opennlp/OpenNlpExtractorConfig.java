@@ -25,6 +25,7 @@ public class OpenNlpExtractorConfig
     public static final String NODE_EXTRACT_PEOPLE = "ExtractPeople";
     public static final String NODE_EXTRACT_LOCATIONS = "ExtractLocations";
     public static final String NODE_EXTRACT_ORGANIZATIONS = "ExtractOrganizations";
+    public static final String NODE_REGEX = "Regex";
     public static final String ATTRIBUTE_VALUE = "value";
     
     private static final String SENTENCE_DETECTOR_BIN = "resources/nlpmodels/en-sent.bin";

@@ -28,21 +28,29 @@ ${SEQNUM} == ${SELECTEDNUM})
 	</tr>
 	<tr>
 		<td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('OpenNlpExtractor.ExtractNouns'))</nobr></td>
-		<td class="value">
-		#if($EXTRACTNOUNS == 'true')
-		 <input
+		<td class="value">#if($EXTRACTNOUNS == 'true') <input
 			type="checkbox" checked="true" name="s${SEQNUM}_extractnouns"
-			value="true" /> 
-		#else 
-		<input type="checkbox"
-			name="s${SEQNUM}_extractnouns" value="true" /> 
-		#end
+			value="true" /> #else <input type="checkbox"
+			name="s${SEQNUM}_extractnouns" value="true" /> #end
 		</td>
 	</tr>
-
+	<tr>
+		<td class="separator" colspan="2"><hr /></td>
+	</tr>
+	<tr>
+		<td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('OpenNlpExtractor.RegexFiltering'))</nobr></td>
+	</tr>
+	<tr>
+		<td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('OpenNlpExtractor.Regex'))</nobr></td>
+		<td class="value"><input type="text" name="s${SEQNUM}_regex"
+			size="128" value="$Encoder.attributeEscape($REGEX)" /></td>
+	</tr>
 </table>
 
 #else
 <input type="hidden" name="s${SEQNUM}_extractnouns"
 	value="$Encoder.bodyEscape($EXTRACTNOUNS)" />
+<input type="hidden" name="s${SEQNUM}_regex"
+	value="$Encoder.bodyEscape($REGEX)" />
+
 #end

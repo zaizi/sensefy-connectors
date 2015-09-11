@@ -108,6 +108,13 @@ public class OpenNlpExtractor extends BaseTransformationConnector
         Tokenizer tokenizer = OpenNlpExtractorConfig.tokenizer();
         POSTagger posTagger = OpenNlpExtractorConfig.posTagger();
         
+        String regex = sp.getRegex();
+        Boolean filterByRegex = false;
+        if(!regex.isEmpty()){
+            filterByRegex = true;
+        }
+        Logging.agents.debug(filterByRegex);
+        
         // create a duplicate
         RepositoryDocument docCopy = document.duplicate();
         
@@ -127,17 +134,31 @@ public class OpenNlpExtractor extends BaseTransformationConnector
                     }
                     if(sp.extractNouns()){
                         if(isMatchingNouns(posTags[i])){
-                            buffer.append(tokens[i].toLowerCase());
-                            buffer.append(",");
+                            if(tokens[i].length() > 2){
+                                if(filterByRegex){
+                                    if(!tokens[i].matches(regex)){
+                                        buffer.append(tokens[i].toLowerCase());
+                                        buffer.append(",");
+                                    }
+                                }
+                                else{
+                                    buffer.append(tokens[i].toLowerCase());
+                                    buffer.append(",");
+                                }
+                                
+                            }
                         }
                     }
                     
                 }
             }
-            buffer.deleteCharAt(buffer.length()-1);
-            Logging.agents.debug(buffer.toString());
-            docCopy.addField(TEXT_FEATURES_FIELD, buffer.toString());
-            docCopy.addField(HAS_CONTENT, "true");
+            if(buffer.length() > 1){
+                buffer.deleteCharAt(buffer.length()-1);
+                Logging.agents.debug(buffer.toString());
+                docCopy.addField(TEXT_FEATURES_FIELD, buffer.toString());
+                docCopy.addField(HAS_CONTENT, "true");
+            }
+            
         }
         // reset original stream
         docCopy.setBinary(new ByteArrayInputStream(bytes), bytes.length);
@@ -275,6 +296,16 @@ public class OpenNlpExtractor extends BaseTransformationConnector
         }
         // Add the new extractnouns config parameter
         os.addChild(os.getChildCount(), node);
+        
+        node = new SpecificationNode(OpenNlpExtractorConfig.NODE_REGEX);
+        String regex = variableContext.getParameter(seqPrefix + "regex");
+        if(regex != null){
+            node.setAttribute(OpenNlpExtractorConfig.ATTRIBUTE_VALUE, regex);
+        }
+        else{
+            node.setAttribute(OpenNlpExtractorConfig.ATTRIBUTE_VALUE, "");
+        }
+        os.addChild(os.getChildCount(), node);
 
         return null;
     }
@@ -303,6 +334,7 @@ public class OpenNlpExtractor extends BaseTransformationConnector
     protected static void fillInFieldMappingSpecificationMap(Map<String, Object> paramMap, Specification os)
     {
         String extractNouns = "true";
+        String regex = "";
         for (int i = 0; i < os.getChildCount(); i++)
         {
             SpecificationNode sn = os.getChild(i);
@@ -310,18 +342,24 @@ public class OpenNlpExtractor extends BaseTransformationConnector
             {
                 extractNouns = sn.getAttributeValue(OpenNlpExtractorConfig.ATTRIBUTE_VALUE);
             }
+            if(sn.getType().equals(OpenNlpExtractorConfig.NODE_REGEX)){
+                regex = sn.getAttributeValue(OpenNlpExtractorConfig.ATTRIBUTE_VALUE);
+            }
         }
         paramMap.put("EXTRACTNOUNS", extractNouns);
+        paramMap.put("REGEX", regex);
     }
 
     protected static class SpecPacker
     {
 
         private final boolean extractNouns;
-
+        private final String regex;
+        
         public SpecPacker(Specification os)
         {
             boolean extractNouns = true;
+            String regex="";
             for (int i = 0; i < os.getChildCount(); i++)
             {
                 SpecificationNode sn = os.getChild(i);
@@ -331,9 +369,14 @@ public class OpenNlpExtractor extends BaseTransformationConnector
                     String value = sn.getAttributeValue(OpenNlpExtractorConfig.ATTRIBUTE_VALUE);
                     extractNouns = Boolean.parseBoolean(value);
                 }
+                if (sn.getType().equals(OpenNlpExtractorConfig.NODE_REGEX))
+                {
+                    regex = sn.getAttributeValue(OpenNlpExtractorConfig.ATTRIBUTE_VALUE);
+                }
 
             }
             this.extractNouns = extractNouns;
+            this.regex=regex;
         }
 
         public String toPackedString()
@@ -345,8 +388,20 @@ public class OpenNlpExtractor extends BaseTransformationConnector
                 sb.append('+');
             else
                 sb.append('-');
+            
+            if(regex != null){
+                sb.append('+');
+                sb.append(regex);
+            }
+            else {
+                sb.append('-');
+            }
 
             return sb.toString();
+        }
+        
+        public String getRegex(){
+            return regex;
         }
 
         public Boolean extractNouns()
