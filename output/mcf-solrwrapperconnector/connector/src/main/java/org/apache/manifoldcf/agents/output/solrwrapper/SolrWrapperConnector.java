@@ -251,7 +251,6 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
         Logging.connectors.info("SolrWrapper - Starting removing doc : " + documentURI);
 
         Map<IndexNames, IOutputConnection> index2connector = this.getConnectors();
-        List<String> childrenEntities;
         List<IndexNames> orderedIndexList = getOrderedIndexes();
         IOutputConnectorPool outputConnectorPool = null;
         outputConnectorPool = OutputConnectorPoolFactory.make(super.currentContext);
@@ -323,24 +322,28 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
         childrenEntities = this.retrieveChildrenFromSolr(documentURI, primaryIndexConnector.getConfiguration(),
                 childType);
 
-        for (String currentId : childrenEntities)
+        if (childrenEntities != null)
         {
-            try
+            for (String currentId : childrenEntities)
             {
-                JSONArray removalUpdateJSON = JSONRepositoryDocumentSerializer.createAtomicRemovalJSON(currentId,
-                        documentURI, removeDocURI);
-                RepositoryDocument removalUpdateRepoDoc = JSONRepositoryDocumentSerializer.createRepoDocFromJSON(
-                        currentId, removalUpdateJSON.toString());
-                
-                outputConnector.addOrReplaceDocument(currentId, outputDescription, removalUpdateRepoDoc,
-                        "authorityNameString", new EmptyOutputAddActivity()); // check the authorityNameString
-            }
-            catch (Exception e)
-            {
-                Logging.connectors.error("Error deleting child doc from : " + currentId, e);
-                continue;
+                try
+                {
+                    JSONArray removalUpdateJSON = JSONRepositoryDocumentSerializer.createAtomicRemovalJSON(currentId,
+                            documentURI, removeDocURI);
+                    RepositoryDocument removalUpdateRepoDoc = JSONRepositoryDocumentSerializer.createRepoDocFromJSON(
+                            currentId, removalUpdateJSON.toString());
+
+                    outputConnector.addOrReplaceDocument(currentId, outputDescription, removalUpdateRepoDoc,
+                            "authorityNameString", new EmptyOutputAddActivity()); // check the authorityNameString
+                }
+                catch (Exception e)
+                {
+                    Logging.connectors.error("Error deleting child doc from : " + currentId, e);
+                    continue;
+                }
             }
         }
+       
     }
 
     /**
