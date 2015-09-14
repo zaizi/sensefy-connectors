@@ -22,7 +22,6 @@ import org.apache.manifoldcf.core.interfaces.*;
 import org.apache.manifoldcf.agents.interfaces.*;
 import org.apache.manifoldcf.agents.system.Logging;
 import org.apache.stanbol.client.Enhancer;
-import org.apache.stanbol.client.EntityHub;
 import org.apache.stanbol.client.StanbolClientFactory;
 import org.apache.stanbol.client.enhancer.impl.EnhancerParameters;
 import org.apache.stanbol.client.enhancer.model.EnhancementStructure;
@@ -39,7 +38,8 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 /**
- * Stanbol Enhancer transformation connector 
+ * Stanbol Enhancer transformation connector
+ * 
  * @author Dileepa Jayakody <djayakody@zaizi.com>
  */
 public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation.BaseTransformationConnector
@@ -50,7 +50,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     private static final String EDIT_SPECIFICATION_FIELDMAPPING_HTML = "editSpecification_FieldMapping.html";
     private static final String VIEW_SPECIFICATION_HTML = "viewSpecification.html";
 
-    private static final String STANBOL_ENDPOINT = "http://localhost:8080/";
+    private static final String STANBOL_ENDPOINT = "http://localhost:8081/";
     private static final String STANBOL_ENHANCEMENT_CHAIN = "default";
     /**
      * DOCUMENTS' FIELDS
@@ -64,13 +64,14 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     static final String SMLT_ENTITY_TYPES_FIELD = "smlt_entity_types";
     static final String SMLT_ENTITY_URI_FIELD = "smlt_entities";
 
-    static final String PERSON_TYPE_FIELD = "has_person";
-    static final String ORGANIZATION_TYPE_FIELD = "has_organization";
-    static final String PLACE_TYPE_FIELD = "has_place";
+    static final String PERSON_TYPE_FIELD = "is_person";
+    static final String ORGANIZATION_TYPE_FIELD = "is_organization";
+    static final String PLACE_TYPE_FIELD = "is_place";
 
     public static final String TYPE_FIELD = "type";
     public static final String LABEL_FIELD = "label";
 
+    // these should be configurable in the stanbol connector ui
     public static final String DESCRIPTION_FIELD = "description";
     public static final String THUMBNAIL_FIELD = "thumbnail";
     public static final String HIERARCHY_FIELD = "hierarchy";
@@ -81,10 +82,8 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     public static final String DBPEDIA_NAMESPACE = "http://dbpedia.org/ontology/";
     public static final String SCHEMA_NAMESPACE = "http://schema.org/";
 
-    // attributes we require from the entity
-    public static final String DEPICTION_ENTITY_ATTRIBUTE = "depiction";
-
-    // main types of entity
+    
+    // main types of entities
     public static final String PERSON_ENTITY_ATTRIBUTE_VALUE = "Person";
     public static final String ORGANIZATION_ENTITY_ATTRIBUTE_VALUE = "Organization";
     public static final String PLACE_ENTITY_ATTRIBUTE_VALUE = "Place";
@@ -210,9 +209,8 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             RepositoryDocument document, String authorityNameString, IOutputAddActivity activities)
             throws ManifoldCFException, ServiceInterruption, IOException
     {
-
         long startTime = System.currentTimeMillis();
-        Logging.agents.debug("Starting to enhance document content in Stanbol connector ");
+        Logging.agents.info("Starting to enhance document content in Stanbol connector ");
 
         String resultCode = "OK";
         String description = null;
@@ -220,6 +218,14 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         SpecPacker sp = new SpecPacker(pipelineDescription.getSpecification());
         // stanbol server url
         String stanbolServer = sp.getStanbolServer();
+        String chain = sp.getStanbolChain();
+
+        // mapping of stanbol props : solr field keys
+        Map<String, String> sourceTargets = sp.getSourceTargets();
+        boolean keepAllMetaData = sp.keepAllMetadata();
+        
+        
+
         stanbolFactory = new StanbolClientFactory(stanbolServer);
 
         // Extracting Content.
@@ -229,13 +235,11 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
         Set<String> uris = new HashSet<String>();
         // entityType uris
-        Collection<String> entityTypes = new HashSet<String>();
-
+        Collection<String> entityTypeURIs = new HashSet<String>();
         Collection<String> entitiesJsons = new ArrayList<String>();
         Collection<String> entitiesTypesJSONs = new ArrayList<String>();
 
         Enhancer enhancerClient = null;
-        EntityHub entityhubClient = null;
         EnhancementStructure eRes = null;
         // Create a copy of Repository Document
         RepositoryDocument docCopy = document.duplicate();
@@ -243,13 +247,10 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
         try
         {
-            String chain = sp.getStanbolChain();
             enhancerClient = stanbolFactory.createEnhancerClient();
-            entityhubClient = stanbolFactory.createEntityHubClient();
-
             EnhancerParameters parameters = EnhancerParameters.builder().setChain(chain).setContent(content).build();
-            eRes = enhancerClient.enhance(parameters);
-
+            eRes = enhancerClient.enhance(parameters);         
+            
         }
         catch (StanbolServiceException e)
         {
@@ -273,46 +274,149 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             boolean hasPersonTypeEntities = false;
             boolean hasOrganizationTypeEntities = false;
             boolean hasPlaceTypeEntities = false;
-            
+
             for (TextAnnotation ta : eRes.getTextAnnotations())
             {
-                //need to disambiguate the eas returned
+                Logging.agents.debug("Processing text annotation for content : " + ta.getUri());
+                // need to disambiguate the entity-annotations returned
                 for (EntityAnnotation ea : eRes.getEntityAnnotations(ta))
                 {
+                    Logging.agents.debug("Processing entity annotation for content : " + ea.getUri());
                     JSONArray nextEntityJSONArray = new JSONArray();
                     JSONObject nextEntityJSON = new JSONObject();
                     nextEntityJSONArray.put(nextEntityJSON);
                     boolean jsonFail = false;
 
+                    Entity entity = null;
+                     // adding only the entity-type label;not the whole URI
+                    Set<String> typeLabels = new HashSet<String>();
+
                     uris.add(ea.getEntityReference());
-                    // Parent Document + Occurrence Counter
                     try
                     {
-                        JSONObject occur = new JSONObject();
-                        occur.put("inc", 1);
-                        nextEntityJSON.put(OCCURRENCES_FIELD, occur);
+                        // dereference the entity
+                        entity = ea.getDereferencedEntity();
+                        if (entity != null)
+                        {
+                            JSONObject occur = new JSONObject();
+                            occur.put("inc", 1);
+                            nextEntityJSON.put(OCCURRENCES_FIELD, occur);
 
-                        // to refer to the primary document in the entity object under doc_ids
-                        JSONObject parentURI = new JSONObject();
-                        parentURI.put("add", documentURI);
-                        nextEntityJSON.put(PARENT_URI_FIELD, parentURI);
-                        nextEntityJSON.put(ENTITY_INDEX_ID_FIELD, ea.getEntityReference());
+                            // to refer to the primary document in the entity object under doc_ids
+                            JSONObject parentURI = new JSONObject();
+                            parentURI.put("add", documentURI);
+                            nextEntityJSON.put(PARENT_URI_FIELD, parentURI);
+                            // putting the ID of the entity
+                            nextEntityJSON.put(ENTITY_INDEX_ID_FIELD, ea.getEntityReference());
 
-                        JSONArray positions = new JSONArray();
-                        JSONObject posEntry = new JSONObject();
-                        posEntry.put("start", ta.getStart());
-                        posEntry.put("end", ta.getEnd());
-                        positions.put(posEntry);
+                            JSONArray positions = new JSONArray();
+                            JSONObject posEntry = new JSONObject();
+                            posEntry.put("start", ta.getStart());
+                            posEntry.put("end", ta.getEnd());
+                            positions.put(posEntry);
 
-                        JSONObject ids2pos = new JSONObject();
-                        ids2pos.put(documentURI, positions);
-                        JSONObject addObject = new JSONObject();
-                        addObject.put("add", ids2pos.toString());
-                        nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
+                            JSONObject ids2pos = new JSONObject();
+                            ids2pos.put(documentURI, positions);
+                            JSONObject addObject = new JSONObject();
+                            
+//issue with ids2pos
+                            addObject.put("add", ids2pos.toString());
+                            nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
 
-                        // manually add some default properties for entities by dileepa
-                        nextEntityJSON.put("label", ea.getEntityLabel());
+                            // manually add some default properties for entities
+                            nextEntityJSON.put(LABEL_FIELD, ea.getEntityLabel());
 
+                            for (String typeURI : entity.getTypes())
+                            {
+                                String typeLiteral = getTypeLiteral(typeURI);
+                                typeLabels.add(typeLiteral);
+
+                                // process entity types for this document, if that entity type
+                                // is not already processed for this document
+                                if (!entityTypeURIs.contains(typeURI))
+                                {
+                                    entityTypeURIs.add(typeURI);
+                                    JSONArray nextEntityTypeJSONArray = new JSONArray();
+                                    JSONObject nextEntityTypeJSON = new JSONObject();
+                                    nextEntityTypeJSONArray.put(nextEntityTypeJSON);
+                                    try
+                                    {
+                                        nextEntityTypeJSON.put(ENTITY_INDEX_ID_FIELD, typeURI);
+                                        JSONObject typeOccur = new JSONObject();
+                                        typeOccur.put("inc", 1);
+                                        nextEntityTypeJSON.put(OCCURRENCES_FIELD, typeOccur);
+                                        nextEntityTypeJSON.put(TYPE_FIELD, typeLiteral);
+
+                                        Collection<String> properties = entity.getProperties();
+
+                                        nextEntityTypeJSON.put(ATTRIBUTES_FIELD, properties);
+                                        entitiesTypesJSONs.add(nextEntityTypeJSONArray.toString());
+
+                                        if (typeLiteral.equalsIgnoreCase(PERSON_ENTITY_ATTRIBUTE_VALUE))
+                                        {
+                                            hasPersonTypeEntities = true;
+
+                                        }
+                                        else if (typeLiteral.equalsIgnoreCase(ORGANIZATION_ENTITY_ATTRIBUTE_VALUE))
+                                        {
+                                            hasOrganizationTypeEntities = true;
+
+                                        }
+                                        else if (typeLiteral.equalsIgnoreCase(PLACE_ENTITY_ATTRIBUTE_VALUE))
+                                        {
+                                            hasPlaceTypeEntities = true;
+
+                                        }
+
+                                        // Hierarchy : no hierarchy implementation in Stanbol
+                                        // Collection<String> hierarchy =
+                                        // helper.getHierarchy().get(typeURI);
+                                        // nextEntityTypeJSON.put( HIERARCHY_FIELD, hierarchy);
+
+                                    }
+                                    catch (JSONException e)
+                                    {
+                                        Logging.agents.error(
+                                                "Error creating Entity Type Document with URI: " + typeURI, e);
+                                        continue; // Continue with next Entity Type
+                                    }
+
+                                }
+
+                            }
+                            // mark entity with the main types
+                            nextEntityJSON = markEntityBasedOnType(nextEntityJSON, typeLabels);
+                            // adding the type to the entity object
+                            nextEntityJSON.put(TYPE_FIELD, typeLabels);
+
+                            if (keepAllMetaData)
+                            {
+                                //all property values are indexed in the entity object
+                                Collection<String> entityProperties = entity.getProperties();
+                                for(String property : entityProperties)
+                                {
+                                    Collection<String> propValues = entity.getPropertyValues(property);
+                                    nextEntityJSON.put(property, propValues);
+                                }
+                            }
+                            
+                            //source mappings
+                            if (sourceTargets != null)
+                            {
+                                // map stanbol fields with solr fields
+                                for (String stanbolField : sourceTargets.keySet())
+                                {
+                                    String solrField = sourceTargets.get(stanbolField);
+                                    Collection<String> fieldValues = entity.getPropertyValues(stanbolField);
+                                    if (fieldValues != null)
+                                    {
+                                        nextEntityJSON.put(solrField, fieldValues);
+                                    }
+                                }
+                            }                             
+
+                            
+                        }
                     }
                     catch (JSONException e)
                     {
@@ -322,127 +426,6 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
                     Logging.agents.debug("Extracted Stanbol entity label : " + ea.getEntityLabel() + " ref uri : "
                             + ea.getEntityReference());
-
-                    Entity entity = null;
-                    // entity types
-                    Collection<String> types = null;
-                    // adding only the entity-type label;not the whole URI
-                    Collection<String> typeLabels = null;
-
-                    try
-                    {
-                        // calling the entityhub to retrieve the entity object for the entityReference
-                        entity = entityhubClient.lookup(ea.getEntityReference(), true);
-                        if(entity != null)
-                        {
-                            // entity types
-                            types = entity.getTypes();
-                            // adding only the entity-type label;not the whole URI
-                            typeLabels = new HashSet<String>();
-                            if(types != null){
-                                for (String typeURI : types)
-                                {
-                                    if (!entityTypes.contains(typeURI))
-                                    {
-                                        entityTypes.add(typeURI);
-                                        JSONArray nextEntityTypeJSONArray = new JSONArray();
-                                        JSONObject nextEntityTypeJSON = new JSONObject();
-                                        nextEntityTypeJSONArray.put(nextEntityTypeJSON);
-                                        try
-                                        {
-                                            nextEntityTypeJSON.put(ENTITY_INDEX_ID_FIELD, typeURI);
-                                            JSONObject occur = new JSONObject();
-                                            occur.put("inc", 1);
-                                            nextEntityTypeJSON.put(OCCURRENCES_FIELD, occur);
-
-                                            // need to put the label of the type;taken as a suggestion in search ui
-                                            String typeLabel = this.getTypeLiteral(typeURI);
-                                            typeLabels.add(typeLabel);
-                                            
-                                            if(typeLabel.equalsIgnoreCase(PERSON_ENTITY_ATTRIBUTE_VALUE))
-                                            {
-                                                hasPersonTypeEntities = true;
-                                                
-                                            } else if(typeLabel.equalsIgnoreCase(ORGANIZATION_ENTITY_ATTRIBUTE_VALUE))
-                                            {
-                                                hasOrganizationTypeEntities = true;
-                                                
-                                            } else if(typeLabel.equalsIgnoreCase(PLACE_ENTITY_ATTRIBUTE_VALUE))
-                                            {
-                                                hasPlaceTypeEntities = true;
-                                            }
-
-                                            nextEntityTypeJSON.put(TYPE_FIELD, typeLabel);
-
-                                            // Hierarchy : no hierarchy implementation in Stanbol
-                                            // Collection<String> hierarchy =
-                                            // helper.getHierarchy().get(typeURI);
-                                            // nextEntityTypeJSON.put( HIERARCHY_FIELD, hierarchy);
-
-                                            Collection<String> properties = entity.getProperties();
-                                            nextEntityTypeJSON.put(ATTRIBUTES_FIELD, properties);
-
-                                            entitiesTypesJSONs.add(nextEntityTypeJSONArray.toString());
-
-                                        }
-                                        catch (JSONException e)
-                                        {
-                                            Logging.agents.error("Error creating Entity Type Document with URI: " + typeURI, e);
-                                            continue; // Continue with next Entity Type
-                                        }
-
-                                    }
-                                }
-                            }
-                           
-                            // adding the type to the entity object
-                            nextEntityJSON.put(TYPE_FIELD, typeLabels);
-
-                            // entity description
-                            Collection<String> comments = entity.getComments();
-                            nextEntityJSON.put(DESCRIPTION_FIELD, comments);
-
-                            // entity depiction
-                            Collection<String> depictions = entity.getPropertyValues(FOAF_NAMESPACE,
-                                    DEPICTION_ENTITY_ATTRIBUTE, false);
-                            nextEntityJSON.put(THUMBNAIL_FIELD, depictions);
-
-                            // putting all the other entity properties to entity json, added to entity solr doc as dynamic
-                            // attributes
-                            for (String prop : entity.getProperties())
-                            {
-                                // List<String> propValues = entity.getPropertyValue(prop, false);
-                                Collection<String> propValues = entity.getPropertyValues(prop);
-                                // properties.putAll(prop, propValues);
-                                if (!jsonFail)
-                                {
-                                    try
-                                    {
-                                        nextEntityJSON.put(prop, propValues);
-                                    }
-                                    catch (JSONException e)
-                                    {
-                                        Logging.agents.error(
-                                                "Error creating Entity Document with URI: " + ea.getEntityReference(), e);
-                                        jsonFail = true;
-                                    }
-                                }
-                            }
-                        }
-
-                    }
-                    catch (StanbolServiceException e)
-                    {
-                        Logging.agents.error(
-                                "Error enhancing the document by retrieving the entity from Stanbol entityhub : "
-                                        + documentURI, e);
-                    }
-                    catch (JSONException e)
-                    {
-                        Logging.agents.error(
-                                "Error creating Entity Document with URI: " + ea.getEntityReference(), e);
-                        jsonFail = true;
-                    }
 
                     if (!jsonFail)
                     {
@@ -464,19 +447,59 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             // // Add Semantic Metadata
             // these are flat fields/ no hierarchy
             docCopy.addField(SMLT_ENTITY_URI_FIELD, uris.toArray(new String[uris.size()]));
-            docCopy.addField(SMLT_ENTITY_TYPES_FIELD, entityTypes.toArray(new String[entityTypes.size()]));
-            
-            //tagging the primary document whether it has person, org, place type entities
+            docCopy.addField(SMLT_ENTITY_TYPES_FIELD, entityTypeURIs.toArray(new String[entityTypeURIs.size()]));
+
+            // tagging the primary document whether it has person, org, place type entities
             docCopy.addField(PERSON_TYPE_FIELD, Boolean.toString(hasPersonTypeEntities));
             docCopy.addField(ORGANIZATION_TYPE_FIELD, Boolean.toString(hasOrganizationTypeEntities));
             docCopy.addField(PLACE_TYPE_FIELD, Boolean.toString(hasPlaceTypeEntities));
         }
-        
+
         // Send new document downstream
         int rval = activities.sendDocument(documentURI, docCopy);
         resultCode = (rval == DOCUMENTSTATUS_ACCEPTED) ? "ACCEPTED" : "REJECTED";
         return rval;
 
+    }
+
+    /**
+     * mark the entity based on it's type as is_person, is_place or is_organization
+     * @param entityObject
+     * @param typeLabels
+     * @return
+     * @throws JSONException
+     */
+    private JSONObject markEntityBasedOnType(JSONObject entityObject, Collection<String> typeLabels)
+            throws JSONException
+    {
+
+        boolean isPersonType = false;
+        boolean isOrgType = false;
+        boolean isPlaceType = false;
+
+        for (String typeLabel : typeLabels)
+        {
+            if (typeLabel.equalsIgnoreCase(PERSON_ENTITY_ATTRIBUTE_VALUE))
+            {
+                isPersonType = true;
+                break;
+            }
+            else if (typeLabel.equalsIgnoreCase(ORGANIZATION_ENTITY_ATTRIBUTE_VALUE))
+            {
+                isOrgType = true;
+                break;
+            }
+            else if (typeLabel.equalsIgnoreCase(PLACE_ENTITY_ATTRIBUTE_VALUE))
+            {
+                isPlaceType = true;
+                break;
+            }
+        }
+        entityObject.put(PERSON_TYPE_FIELD, isPersonType);
+        entityObject.put(ORGANIZATION_TYPE_FIELD, isOrgType);
+        entityObject.put(PLACE_TYPE_FIELD, isPlaceType);
+
+        return entityObject;
     }
 
     /**
@@ -587,6 +610,73 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     {
         String seqPrefix = "s" + connectionSequenceNumber + "_";
 
+        // added for attrib mappings
+        String x;
+
+        x = variableContext.getParameter(seqPrefix + "fieldmapping_count");
+        if (x != null && x.length() > 0)
+        {
+            // About to gather the fieldmapping nodes, so get rid of the old ones.
+            int i = 0;
+            while (i < os.getChildCount())
+            {
+                SpecificationNode node = os.getChild(i);
+                if (node.getType().equals(StanbolConfig.NODE_FIELDMAP)
+                        || node.getType().equals(StanbolConfig.NODE_KEEPMETADATA))
+                    os.removeChild(i);
+                else
+                    i++;
+            }
+            int count = Integer.parseInt(x);
+            i = 0;
+            while (i < count)
+            {
+                String prefix = seqPrefix + "fieldmapping_";
+                String suffix = "_" + Integer.toString(i);
+                String op = variableContext.getParameter(prefix + "op" + suffix);
+                if (op == null || !op.equals("Delete"))
+                {
+                    // Gather the fieldmap etc.
+                    String source = variableContext.getParameter(prefix + "source" + suffix);
+                    String target = variableContext.getParameter(prefix + "target" + suffix);
+                    if (target == null)
+                        target = "";
+                    SpecificationNode node = new SpecificationNode(StanbolConfig.NODE_FIELDMAP);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
+                    os.addChild(os.getChildCount(), node);
+                }
+                i++;
+            }
+
+            String addop = variableContext.getParameter(seqPrefix + "fieldmapping_op");
+            if (addop != null && addop.equals("Add"))
+            {
+                String source = variableContext.getParameter(seqPrefix + "fieldmapping_source");
+                String target = variableContext.getParameter(seqPrefix + "fieldmapping_target");
+                if (target == null)
+                    target = "";
+                SpecificationNode node = new SpecificationNode(StanbolConfig.NODE_FIELDMAP);
+                node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
+                node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
+                os.addChild(os.getChildCount(), node);
+            }
+
+            // Gather the keep all metadata parameter to be the last one
+            SpecificationNode node = new SpecificationNode(StanbolConfig.NODE_KEEPMETADATA);
+            String keepAll = variableContext.getParameter(seqPrefix + "keepallmetadata");
+            if (keepAll != null)
+            {
+                node.setAttribute(StanbolConfig.ATTRIBUTE_VALUE, keepAll);
+            }
+            else
+            {
+                node.setAttribute(StanbolConfig.ATTRIBUTE_VALUE, "false");
+            }
+            // Add the new keepallmetadata config parameter
+            os.addChild(os.getChildCount(), node);
+        }
+
         String stanbolURLValue = variableContext.getParameter(seqPrefix + "stanbol_url");
         if (stanbolURLValue == null || stanbolURLValue.equalsIgnoreCase(""))
             stanbolURLValue = STANBOL_ENDPOINT;
@@ -631,10 +721,36 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
     protected static void fillInFieldMappingSpecificationMap(Map<String, Object> paramMap, Specification os)
     {
+
+        // Prep for field mappings
+        List<Map<String, String>> fieldMappings = new ArrayList<Map<String, String>>();
+        String keepAllMetadataValue = "true";
         for (int i = 0; i < os.getChildCount(); i++)
         {
             SpecificationNode sn = os.getChild(i);
-            if (sn.getType().equals(StanbolConfig.STANBOL_SERVER_VALUE))
+            if (sn.getType().equals(StanbolConfig.NODE_FIELDMAP))
+            {
+                String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
+                String targetDisplay;
+                if (target == null)
+                {
+                    target = "";
+                    targetDisplay = "(remove)";
+                }
+                else
+                    targetDisplay = target;
+                Map<String, String> fieldMapping = new HashMap<String, String>();
+                fieldMapping.put("SOURCE", source);
+                fieldMapping.put("TARGET", target);
+                fieldMapping.put("TARGETDISPLAY", targetDisplay);
+                fieldMappings.add(fieldMapping);
+            }
+            else if (sn.getType().equals(StanbolConfig.NODE_KEEPMETADATA))
+            {
+                keepAllMetadataValue = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
+            }
+            else if (sn.getType().equals(StanbolConfig.STANBOL_SERVER_VALUE))
             {
                 String server = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
                 paramMap.put("STANBOL_SERVER", server);
@@ -646,19 +762,24 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                 paramMap.put("STANBOL_CHAIN", chain);
             }
         }
+        paramMap.put("FIELDMAPPINGS", fieldMappings);
+        paramMap.put("KEEPALLMETADATA", keepAllMetadataValue);
+
     }
 
     protected static class SpecPacker
     {
         private final String stanbolServer;
-
         private final String stanbolChain;
+        private final boolean keepAllMetadata;
+        private final Map<String, String> sourceTargets = new HashMap<String, String>();
 
         public SpecPacker(Specification os)
         {
 
             String serverURL = STANBOL_ENDPOINT;
             String stanbolChain = STANBOL_ENHANCEMENT_CHAIN;
+            boolean keepAllMetadata = true;
 
             for (int i = 0; i < os.getChildCount(); i++)
             {
@@ -674,15 +795,58 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                     stanbolChain = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
 
                 }
+                // adding metadata
+                else if (sn.getType().equals(StanbolConfig.NODE_KEEPMETADATA))
+                {
+                    String value = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
+                    keepAllMetadata = Boolean.parseBoolean(value);
+                }
+                else if (sn.getType().equals(StanbolConfig.NODE_FIELDMAP))
+                {
+                    String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                    String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
+
+                    if (target == null)
+                    {
+                        target = "";
+                    }
+                    sourceTargets.put(source, target);
+                }
 
             }
             this.stanbolServer = serverURL;
             this.stanbolChain = stanbolChain;
+            this.keepAllMetadata = keepAllMetadata;
+
         }
 
         public String toPackedString()
         {
             StringBuilder sb = new StringBuilder();
+
+            int i;
+            // Mappings
+            final String[] sortArray = new String[sourceTargets.size()];
+            i = 0;
+            for (String source : sourceTargets.keySet())
+            {
+                sortArray[i++] = source;
+            }
+            java.util.Arrays.sort(sortArray);
+
+            List<String> packedMappings = new ArrayList<String>();
+            String[] fixedList = new String[2];
+            for (String source : sortArray)
+            {
+                String target = sourceTargets.get(source);
+                StringBuilder localBuffer = new StringBuilder();
+                fixedList[0] = source;
+                fixedList[1] = target;
+                packFixedList(localBuffer, fixedList, ':');
+                packedMappings.add(localBuffer.toString());
+            }
+            packList(sb, packedMappings, '+');
+
             if (stanbolServer != null)
             {
                 sb.append('+');
@@ -713,6 +877,16 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         public String getStanbolChain()
         {
             return stanbolChain;
+        }
+
+        public Map<String, String> getSourceTargets()
+        {
+            return sourceTargets;
+        }
+
+        public boolean keepAllMetadata()
+        {
+            return keepAllMetadata;
         }
 
     }

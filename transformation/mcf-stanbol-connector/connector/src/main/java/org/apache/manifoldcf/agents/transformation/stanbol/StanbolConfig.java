@@ -33,7 +33,9 @@ public class StanbolConfig {
   public static final String STANBOL_SERVER_VALUE = "stanbol_server";
   public static final String STANBOL_CHAIN_VALUE = "stanbol_chain";
   
-  
-  
-  
+  public static final String NODE_FIELDMAP = "fieldmap";
+  public static final String NODE_KEEPMETADATA = "keepAllMetadata";
+  public static final String ATTRIBUTE_SOURCE = "source";
+  public static final String ATTRIBUTE_TARGET = "target";
+    
 }
