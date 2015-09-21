@@ -316,19 +316,18 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                 // putting the ID of the entity
                                 nextEntityJSON.put(ENTITY_INDEX_ID_FIELD, ea.getEntityReference());
 
-                                JSONArray positions = new JSONArray();
-                                JSONObject posEntry = new JSONObject();
-                                posEntry.put("start", ta.getStart());
-                                posEntry.put("end", ta.getEnd());
-                                positions.put(posEntry);
-
-                                JSONObject ids2pos = new JSONObject();
-                                ids2pos.put(documentURI, positions);
-                                JSONObject addObject = new JSONObject();
-
-                                // issue with ids2pos
-                                addObject.put("add", ids2pos.toString());
-                                nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
+//                                JSONArray positions = new JSONArray();
+//                                JSONObject posEntry = new JSONObject();
+//                                posEntry.put("start", ta.getStart());
+//                                posEntry.put("end", ta.getEnd());
+//                                positions.put(posEntry);
+//
+//                                JSONObject ids2pos = new JSONObject();
+//                                ids2pos.put(documentURI, positions);
+//                                JSONObject addObject = new JSONObject();
+//
+//                                addObject.put("add", ids2pos.toString());
+//                                nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
 
                                 // manually add some default properties for entities
                                 nextEntityJSON.put(LABEL_FIELD, ea.getEntityLabel());

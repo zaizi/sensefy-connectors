@@ -1,7 +1,5 @@
 package org.apache.manifoldcf.agents.transformation.stanbol;
 
-/* $Id: TikaConfig.java 1612814 2014-07-23 11:50:59Z kwright $ */
-
 /**
 * Licensed to the Apache Software Foundation (ASF) under one or more
 * contributor license agreements. See the NOTICE file distributed with
@@ -25,9 +23,7 @@ package org.apache.manifoldcf.agents.transformation.stanbol;
  */
 public class StanbolConfig {
 
-  // Configuration parameters
-  // None
-
+ 
   // Specification nodes and values
   public static final String ATTRIBUTE_VALUE = "value"; 
   public static final String STANBOL_SERVER_VALUE = "stanbol_server";
