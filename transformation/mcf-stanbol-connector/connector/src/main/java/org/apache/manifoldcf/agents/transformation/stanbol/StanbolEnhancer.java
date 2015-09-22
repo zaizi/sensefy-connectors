@@ -18,6 +18,7 @@ package org.apache.manifoldcf.agents.transformation.stanbol;
  */
 
 import org.apache.commons.io.IOUtils;
+import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.manifoldcf.core.interfaces.*;
 import org.apache.manifoldcf.agents.interfaces.*;
 import org.apache.manifoldcf.agents.system.Logging;
@@ -31,11 +32,13 @@ import org.apache.stanbol.client.entityhub.model.Entity;
 import org.apache.stanbol.client.services.exception.StanbolServiceException;
 
 import java.io.*;
+import java.net.URI;
 import java.util.*;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.openrdf.model.impl.URIImpl;
 
 /**
  * Stanbol Enhancer transformation connector
@@ -70,6 +73,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
     public static final String TYPE_FIELD = "type";
     public static final String LABEL_FIELD = "label";
+    public static final String NAME_FIELD = "name";
 
     // these should be configurable in the stanbol connector ui
     public static final String DESCRIPTION_FIELD = "description";
@@ -316,25 +320,38 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                 // putting the ID of the entity
                                 nextEntityJSON.put(ENTITY_INDEX_ID_FIELD, ea.getEntityReference());
 
-//                                JSONArray positions = new JSONArray();
-//                                JSONObject posEntry = new JSONObject();
-//                                posEntry.put("start", ta.getStart());
-//                                posEntry.put("end", ta.getEnd());
-//                                positions.put(posEntry);
-//
-//                                JSONObject ids2pos = new JSONObject();
-//                                ids2pos.put(documentURI, positions);
-//                                JSONObject addObject = new JSONObject();
-//
-//                                addObject.put("add", ids2pos.toString());
-//                                nextEntityJSON.put(DOC_IDS2POS_FIELD, addObject);
-
                                 // manually add some default properties for entities
                                 nextEntityJSON.put(LABEL_FIELD, ea.getEntityLabel());
+                                
+                                if (keepAllMetaData)
+                                {
+                                    // all property values are indexed in the entity object
+                                    Collection<String> entityProperties = entity.getProperties();
+                                    for (String property : entityProperties)
+                                    {
+                                        String localPropertyName = getURILocalName(property);
+                                        // filtering english label, name properties if language attribute is available
+                                        if (localPropertyName.equals(NAME_FIELD)
+                                                || localPropertyName.equals(LABEL_FIELD))
+                                        {
+                                            Collection<String> englishLiteralValues = entity.getPropertyValuesByLanguage(property, "en");
+                                            if (englishLiteralValues != null)
+                                            {
+                                                nextEntityJSON.put(NAME_FIELD, englishLiteralValues);
+                                            }
+                                        }
+                                        else
+                                        {
+                                            Collection<String> propValues = entity.getPropertyValues(property);
+                                            nextEntityJSON.put(localPropertyName, propValues);
+                                        }
+
+                                    }
+                                }
 
                                 for (String typeURI : entity.getTypes())
                                 {
-                                    String typeLiteral = getTypeLiteral(typeURI);
+                                    String typeLiteral = getURILocalName(typeURI);
                                     typeLabels.add(typeLiteral);
 
                                     // process entity types for this document, if that entity type
@@ -345,6 +362,9 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                         JSONArray nextEntityTypeJSONArray = new JSONArray();
                                         JSONObject nextEntityTypeJSON = new JSONObject();
                                         nextEntityTypeJSONArray.put(nextEntityTypeJSON);
+
+                                        Set<String> propertyNames = new HashSet<String>();
+
                                         try
                                         {
                                             nextEntityTypeJSON.put(ENTITY_INDEX_ID_FIELD, typeURI);
@@ -355,7 +375,13 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
                                             Collection<String> properties = entity.getProperties();
 
-                                            nextEntityTypeJSON.put(ATTRIBUTES_FIELD, properties);
+                                            for (String property : properties)
+                                            {
+                                                String localName = getURILocalName(property);
+                                                propertyNames.add(localName);
+                                            }
+
+                                            nextEntityTypeJSON.put(ATTRIBUTES_FIELD, propertyNames);
                                             entitiesTypesJSONs.add(nextEntityTypeJSONArray.toString());
 
                                             if (typeLiteral.equalsIgnoreCase(PERSON_ENTITY_ATTRIBUTE_VALUE))
@@ -394,18 +420,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                 nextEntityJSON = markEntityBasedOnType(nextEntityJSON, typeLabels);
                                 // adding the type to the entity object
                                 nextEntityJSON.put(TYPE_FIELD, typeLabels);
-
-                                if (keepAllMetaData)
-                                {
-                                    // all property values are indexed in the entity object
-                                    Collection<String> entityProperties = entity.getProperties();
-                                    for (String property : entityProperties)
-                                    {
-                                        Collection<String> propValues = entity.getPropertyValues(property);
-                                        nextEntityJSON.put(property, propValues);
-                                    }
-                                }
-
+                               
                                 // source mappings
                                 if (sourceTargets != null)
                                 {
@@ -507,18 +522,18 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         return entityObject;
     }
 
-    /**
-     * process the type uri and return the literal value
-     * 
-     * @param typeURI
-     * @return
-     */
-    private String getTypeLiteral(String typeURI)
-    {
-        int startIndex = typeURI.lastIndexOf("/") + 1;
-        String typeLabel = typeURI.substring(startIndex);
-        return typeLabel;
-    }
+    // /**
+    // * process the type uri and return the literal value
+    // *
+    // * @param typeURI
+    // * @return
+    // */
+    // private String getTypeLiteral(String typeURI)
+    // {
+    // int startIndex = typeURI.lastIndexOf("/") + 1;
+    // String typeLabel = typeURI.substring(startIndex);
+    // return typeLabel;
+    // }
 
     /**
      * Obtain the name of the form check javascript method to call.
@@ -894,6 +909,21 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             return keepAllMetadata;
         }
 
+    }
+
+    // util methods
+    private String getURILocalName(String uri)
+    {
+        UrlValidator urlValidator = new UrlValidator();
+        if (urlValidator.isValid(uri))
+        {
+            URIImpl uriImpl = new URIImpl(uri);
+            return uriImpl.getLocalName();
+        }
+        else
+        {
+            return uri;
+        }
     }
 
 }
