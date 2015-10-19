@@ -446,9 +446,9 @@ public class NodeDetailsWebScript extends DeclarativeWebScript implements Initia
         String alfrescoPrefix = sysAdminParams.getAlfrescoProtocol() + "://" + sysAdminParams.getAlfrescoHost()
                 + (alfrescoWithPort ? ":" + sysAdminParams.getAlfrescoPort() : "") + "/"
                 + sysAdminParams.getAlfrescoContext();
-        contentUrlPrefix = alfrescoPrefix + "/service";
-        previewUrlPrefix = alfrescoPrefix + "/service";
-        thumbnailUrlPrefix = alfrescoPrefix + "/service";
+//        contentUrlPrefix = alfrescoPrefix + "/service";
+//        previewUrlPrefix = alfrescoPrefix + "/service";
+//        thumbnailUrlPrefix = alfrescoPrefix + "/service";
 
         boolean shareWithPort = true;
         if ((sysAdminParams.getShareProtocol() == "https" && sysAdminParams.getSharePort() == 443)
@@ -458,6 +458,10 @@ public class NodeDetailsWebScript extends DeclarativeWebScript implements Initia
         }
         shareUrlPrefix = sysAdminParams.getShareProtocol() + "://" + sysAdminParams.getShareHost()
                 + (shareWithPort ? ":" + sysAdminParams.getSharePort() : "") + "/" + sysAdminParams.getShareContext();
+
+        contentUrlPrefix = shareUrlPrefix + "/proxy/alfresco";
+        previewUrlPrefix = shareUrlPrefix + "/proxy/alfresco";
+        thumbnailUrlPrefix = shareUrlPrefix + "/proxy/alfresco";
 
     }
 
