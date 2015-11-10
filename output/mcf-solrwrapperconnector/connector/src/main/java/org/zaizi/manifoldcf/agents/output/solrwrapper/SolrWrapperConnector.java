@@ -1,4 +1,4 @@
-/* $Id: NullConnector.java 988245 2010-08-23 18:39:35Z kwright $ */
+/* $Id: NullConnector.java 988245 2010, 2015-08-23 18:39:35Z kwright $ */
 
 /**
  * Licensed to the Apache Software Foundation (ASF) under one or more
