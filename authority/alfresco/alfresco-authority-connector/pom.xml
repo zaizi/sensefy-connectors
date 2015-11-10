@@ -14,13 +14,13 @@
 	xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
 	<modelVersion>4.0.0</modelVersion>
 
-	<groupId>com.zaizi.manifoldcf</groupId>
+	<groupId>org.zaizi.manifoldcf</groupId>
 	<artifactId>alfresco-authority-connector</artifactId>
 	<version>1.0</version>
 	<name>ManifoldCF - Connectors - Alfresco Authority</name>
 
 	<properties>
-		<manifoldcf.version>1.8-SNAPSHOT</manifoldcf.version>
+		<manifoldcf.version>1.8.2</manifoldcf.version>
 		<httpclient.version>4.2.3</httpclient.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>

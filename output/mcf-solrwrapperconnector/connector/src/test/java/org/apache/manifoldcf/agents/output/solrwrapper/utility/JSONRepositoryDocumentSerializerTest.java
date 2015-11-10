@@ -6,6 +6,8 @@ import org.apache.manifoldcf.agents.interfaces.RepositoryDocument;
 import org.apache.manifoldcf.core.interfaces.ManifoldCFException;
 import org.json.JSONArray;
 import org.json.JSONException;
+import org.zaizi.manifoldcf.agents.output.solrwrapper.utility.IndexNames;
+import org.zaizi.manifoldcf.agents.output.solrwrapper.utility.JSONRepositoryDocumentSerializer;
 
 import java.io.IOException;
 import java.io.InputStream;
