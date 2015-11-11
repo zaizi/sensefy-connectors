@@ -27,6 +27,7 @@ In addition to connectors, this includes **authority/alfresco/alfresco-manifold*
 
 ## Building Connectors
 ---
+
 In order to build the connectors, first you need to build ManifoldCF as the connectors have dependencies from MCF project
 
 ```
@@ -41,8 +42,31 @@ Once ManifoldCF dependancies are installed, you can build the connectors and the
 mvn clean install -DskipTests=true
 ```
 
+### Build Alfresco Indexer and Indexer AMP
+
+```
+git clone https://github.com/zaizi/alfresco-webscript-manifold-connector.git 
+cd alfresco-webscript-manifold-connector/
+mvn clean install -DskipTests=true
+```
+
+This builds the followings
+
+1. alfresco-indexer-webscripts - AMP file to be installed in Alfresco
+2. alfresco-indexer-client - to be configure with ManifoldCF
+3. manifold-connector - to be configure with ManifoldCF
+
+
 ## Configuring Alfresco with AMP files
 ---
+
+1. Copy **alfresco-indexer-webscripts.amp** in *alfresco-webscript-manifold-connector/alfresco-indexer-webscripts/target/* to your $ALFRESCO_INSTALLATION_DIR/amps
+2. Copy **alfresco-manifold.amp** in *sensefy-connectors/authority/alfresco/alfresco-manifold/target/ to your $ALFRESCO_INSTALLATION_DIR/amps
+3. To apply amp files to Alfresco, run following from $ALFRESCO_INSTALL_DIR
+
+```
+./bin/apply_amps.sh -force
+```
 
 ## Deploying Connectors to ManifoldCF
 ---
