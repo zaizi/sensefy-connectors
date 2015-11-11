@@ -37,8 +37,8 @@ import java.util.ResourceBundle;
  *
  */
 public class Messages extends org.apache.manifoldcf.ui.i18n.Messages {
-    public static final String DEFAULT_BUNDLE_NAME = "org.apache.manifoldcf.agents.output.solrwrapper.common";
-    public static final String DEFAULT_PATH_NAME = "org.apache.manifoldcf.agents.output.solrwrapper";
+    public static final String DEFAULT_BUNDLE_NAME = "org.zaizi.manifoldcf.agents.output.solrwrapper.common";
+    public static final String DEFAULT_PATH_NAME = "org.zaizi.manifoldcf.agents.output.solrwrapper";
 
     /**
      * Constructor - do no instantiate

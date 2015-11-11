@@ -31,8 +31,8 @@ import java.util.Map;
  *
  */
 public class Messages extends org.apache.manifoldcf.ui.i18n.Messages {
-  public static final String DEFAULT_BUNDLE_NAME = "org.apache.manifoldcf.authorities.authorities.alfresco.common";
-  public static final String DEFAULT_PATH_NAME = "org.apache.manifoldcf.authorities.authorities.alfresco";
+  public static final String DEFAULT_BUNDLE_NAME = "org.zaizi.manifoldcf.authorities.authorities.alfresco.common";
+  public static final String DEFAULT_PATH_NAME = "org.zaizi.manifoldcf.authorities.authorities.alfresco";
 
   /**
    * Constructor - do no instantiate

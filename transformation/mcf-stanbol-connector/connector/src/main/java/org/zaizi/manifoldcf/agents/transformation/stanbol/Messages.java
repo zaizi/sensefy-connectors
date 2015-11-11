@@ -25,8 +25,8 @@ import org.apache.manifoldcf.core.interfaces.IHTTPOutput;
 
 public class Messages extends org.apache.manifoldcf.ui.i18n.Messages
 {
-  public static final String DEFAULT_BUNDLE_NAME="org.apache.manifoldcf.agents.transformation.stanbol.common";
-  public static final String DEFAULT_PATH_NAME="org.apache.manifoldcf.agents.transformation.stanbol";
+  public static final String DEFAULT_BUNDLE_NAME="org.zaizi.manifoldcf.agents.transformation.stanbol.common";
+  public static final String DEFAULT_PATH_NAME="org.zaizi.manifoldcf.agents.transformation.stanbol";
   
   /** Constructor - do no instantiate
   */
