@@ -20,7 +20,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>org.zaizi</groupId>
     <artifactId>manifoldcf</artifactId>
-    <version>1.0</version>
+    <version>1.8-SNAPSHOT</version>
     <packaging>pom</packaging>
     
     <modules>

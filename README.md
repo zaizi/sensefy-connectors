@@ -30,15 +30,7 @@ In addition to connectors, this includes **authority/alfresco/alfresco-manifold*
 ## Building Connectors
 ---
 
-In order to build the connectors, first you need to build ManifoldCF as the connectors have dependencies from MCF project
-
-```
-svn co https://svn.apache.org/repos/asf/manifoldcf/tags/release-1.8.2/ manifoldcf
-cd manifoldcf
-mvn clean install -DskipTests=true
-```
-
-Once ManifoldCF dependancies are installed, you can build the connectors and the AMP file by running,
+Build the connectors and the AMP file by running,
 
 ```
 mvn clean install -DskipTests=true
@@ -71,5 +63,26 @@ This builds the followings
 
 ```
 ./bin/apply_amps.sh -force
+```
+
+## Adding Connectors to ManifoldCF
+
+Add following connectors to **$MANIFOLD_INSTALL_DIR/connectors-lib**
+
+```
+1. sensefy-connectors/authority/alfresco/alfresco-authority-connector/target/alfresco-authority-connector-1.0.jar
+2. sensefy-connectors/output/mcf-solrwrapperconnector/target/mcf-solrwrapperprocessorconnector-connector-1.8-SNAPSHOT.jar
+3. sensefy-connectors/transformation/mcf-stanbol-connector/target/mcf-stanbol-connector-1.8-SNAPSHOT-jar-with-dependencies.jar
+4. alfresco-webscript-manifold-connector/manifold-connector/target/manifold-connector-0.6.1-jar-with-dependencies.jar
+```
+
+Add following properties to **$MANIFOLD_INSTALL_DIR/connectors.xml**
+
+```
+<authorityconnector name="Alfresco" class="org.apache.manifoldcf.authorities.authorities.alfresco.AlfrescoAuthorityConnector"/>
+<repositoryconnector name="Alfresco" class="org.alfresco.consulting.manifold.AlfrescoConnector"/>
+<transformationconnector name="Stanbol enhancer" class="org.apache.manifoldcf.agents.transformation.stanbol.StanbolEnhancer"/>
+<outputconnector name="Solr Wrapper" class="org.apache.manifoldcf.agents.output.solrwrapper.SolrWrapperConnector"/>
+
 ```
 

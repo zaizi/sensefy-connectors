@@ -27,7 +27,7 @@
 	<name>ManifoldCF - Connectors - Alfresco Authority</name>
 
 	<properties>
-		<manifoldcf.version>1.8.2</manifoldcf.version>
+		<manifoldcf.version>1.8-SNAPSHOT</manifoldcf.version>
 		<httpclient.version>4.2.3</httpclient.version>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 	</properties>
