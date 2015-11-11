@@ -63,9 +63,11 @@ This builds the followings
 ## Configuring Alfresco with AMP files
 ---
 
+```
 1. Copy **alfresco-indexer-webscripts.amp** in *alfresco-webscript-manifold-connector/alfresco-indexer-webscripts/target/* to your *$ALFRESCO_INSTALLATION_DIR/amps*
 2. Copy **alfresco-manifold.amp** in *sensefy-connectors/authority/alfresco/alfresco-manifold/target/* to your *$ALFRESCO_INSTALLATION_DIR/amps*
 3. To apply amp files to Alfresco, run following from $ALFRESCO_INSTALL_DIR
+```
 
 ```
 ./bin/apply_amps.sh -force
@@ -73,3 +75,4 @@ This builds the followings
 
 ## Deploying Connectors to ManifoldCF
 ---
+
