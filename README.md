@@ -1,18 +1,3 @@
-/**
-* (C) Copyright 2015 Zaizi Limited (http://www.zaizi.com). 
-* 
-* All rights reserved.  This program and the accompanying materials
-* are made available under the terms of the GNU Lesser General Public License
-* (LGPL) version 3.0 which accompanies this distribution, and is available at
-* http://www.gnu.org/licenses/lgpl-3.0.en.html
-*
-* This library is distributed in the hope that it will be useful,
-* but WITHOUT ANY WARRANTY; without even the implied warranty of
-* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
-* Lesser General Public License for more details.
-*
-*/
-
 # Sensefy ManifoldCF Connectors
 ---
 
@@ -85,4 +70,11 @@ Add following properties to **$MANIFOLD_INSTALL_DIR/connectors.xml**
 <outputconnector name="Solr Wrapper" class="org.apache.manifoldcf.agents.output.solrwrapper.SolrWrapperConnector"/>
 
 ```
+
+#### Copyright
+
+
+© Zaizi Limited. Code for this plugin is licensed under the GNU Lesser General Public License (LGPL).
+
+Any trademarks and logos included in these plugins are property of their respective owners and should not be reused, redistributed, modified, repurposed, or otherwise altered or used outside of this plugin.
 
