@@ -1,5 +1,6 @@
 #!/bin/bash
-WORKSPACE=libs
+WORKSPACE_JAR=jars
+WORKSPACE_POM=poms
 MANIFOLD_VERSION=1.8-SNAPSHOT
 
 mvn install:install-file \
@@ -7,33 +8,36 @@ mvn install:install-file \
   -DartifactId=mcf-core \
   -Dpackaging=jar \
   -Dversion=${MANIFOLD_VERSION} \
-  -Dfile=${WORKSPACE}/mcf-core.jar
+  -Dfile=${WORKSPACE_JAR}/mcf-core.jar
 
 mvn install:install-file \
   -DgroupId=org.apache.manifoldcf \
   -DartifactId=mcf-agents \
   -Dpackaging=jar \
   -Dversion=${MANIFOLD_VERSION} \
-  -Dfile=${WORKSPACE}/mcf-agents.jar
+  -Dfile=${WORKSPACE_JAR}/mcf-agents.jar
 
 mvn install:install-file \
   -DgroupId=org.apache.manifoldcf \
   -DartifactId=mcf-pull-agent \
   -Dpackaging=jar \
   -Dversion=${MANIFOLD_VERSION} \
-  -Dfile=${WORKSPACE}/mcf-pull-agent.jar
+  -Dfile=${WORKSPACE_JAR}/mcf-pull-agent.jar
 
 mvn install:install-file \
   -DgroupId=org.apache.manifoldcf \
   -DartifactId=mcf-ui-core \
   -Dpackaging=jar \
   -Dversion=${MANIFOLD_VERSION} \
-  -Dfile=${WORKSPACE}/mcf-ui-core.jar
+  -Dfile=${WORKSPACE_JAR}/mcf-ui-core.jar
 
 mvn install:install-file \
   -DgroupId=org.apache.manifoldcf \
   -DartifactId=mcf-solr-connector \
   -Dpackaging=jar \
   -Dversion=${MANIFOLD_VERSION} \
-  -Dfile=${WORKSPACE}/mcf-solr-connector.jar
+  -Dfile=${WORKSPACE_JAR}/mcf-solr-connector.jar
 
+mvn install:install-file \
+  -Dfile=poms/mcf-connectors.pom \
+  -DpomFile=poms/mcf-connectors.pom 
