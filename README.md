@@ -19,7 +19,7 @@ In order to build the connectors, first need to download and build manifoldcf to
 git clone https://github.com/apache/manifoldcf.git
 cd manifoldcf/
 git checkout release-2.2-branch
-mvn clean install -Dmaven.test.skip=true
+mvn clean install 
 ```
 
 Build the connectors by running following command from sensefy-connectors directory,
@@ -47,7 +47,7 @@ This builds the followings
 ---
 
 ```
-1. Copy alfresco-indexer-webscripts.amp in alfresco-webscript-manifold-connector/alfresco-indexer-webscripts/target/ to your $ALFRESCO_INSTALLATION_DIR/amps
+1. Copy alfresco-indexer-webscripts.amp in alfresco-indexer/alfresco-indexer-webscripts/target/ to your $ALFRESCO_INSTALLATION_DIR/amps
 
 2. To apply amp files to Alfresco, run following from $ALFRESCO_INSTALL_DIR
 ```
