@@ -744,7 +744,6 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         String chain = STANBOL_ENHANCEMENT_CHAIN;       
         String keepAllMetadataValue = "true";
         
-        
         for (int i = 0; i < os.getChildCount(); i++)
         {
             SpecificationNode sn = os.getChild(i);

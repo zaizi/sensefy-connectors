@@ -27,7 +27,6 @@ import org.apache.manifoldcf.agents.interfaces.IOutputNotifyActivity;
 import org.apache.manifoldcf.agents.interfaces.IOutputRemoveActivity;
 import org.apache.manifoldcf.agents.interfaces.OutputConnectionManagerFactory;
 import org.apache.manifoldcf.agents.interfaces.OutputConnectorPoolFactory;
-import org.apache.manifoldcf.agents.interfaces.OutputSpecification;
 import org.apache.manifoldcf.agents.interfaces.RepositoryDocument;
 import org.apache.manifoldcf.agents.interfaces.ServiceInterruption;
 import org.apache.manifoldcf.agents.output.BaseOutputConnector;
@@ -36,11 +35,13 @@ import org.apache.manifoldcf.core.interfaces.IHTTPOutput;
 import org.apache.manifoldcf.core.interfaces.IPostParameters;
 import org.apache.manifoldcf.core.interfaces.IThreadContext;
 import org.apache.manifoldcf.core.interfaces.ManifoldCFException;
+import org.apache.manifoldcf.core.interfaces.Specification;
+import org.apache.manifoldcf.core.interfaces.VersionContext;
 import org.apache.manifoldcf.crawler.system.Logging;
 import org.apache.manifoldcf.ui.beans.ThreadContext;
 import org.apache.solr.client.solrj.SolrQuery;
 import org.apache.solr.client.solrj.SolrServerException;
-import org.apache.solr.client.solrj.impl.HttpSolrServer;
+import org.apache.solr.client.solrj.impl.HttpSolrClient;
 import org.apache.solr.client.solrj.response.QueryResponse;
 import org.apache.solr.common.SolrDocument;
 import org.apache.solr.common.SolrDocumentList;
@@ -215,15 +216,15 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      *         store.
      */
     @Override
-    public String getOutputDescription(OutputSpecification spec) throws ManifoldCFException, ServiceInterruption
+    public VersionContext getPipelineDescription(Specification spec) throws ManifoldCFException, ServiceInterruption
     {
-        String outputDescription = "";
+        VersionContext outputDescription = null;
 
         Map<IndexNames, IOutputConnection> index2connector = this.getConnectors();
         IOutputConnection iOutputConnection = index2connector.get(IndexNames.PRIMARY_INDEX);
         IOutputConnectorPool outputConnectorPool = OutputConnectorPoolFactory.make(super.currentContext);
         BaseOutputConnector outputConnector = (BaseOutputConnector) outputConnectorPool.grab(iOutputConnection);
-        outputDescription = outputConnector.getOutputDescription(spec);
+        outputDescription = outputConnector.getPipelineDescription(spec);
         outputConnectorPool.release(iOutputConnection, outputConnector);
 
         return outputDescription;
@@ -243,8 +244,8 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      * @param activities is the handle to an object that the implementer of an output connector may use to perform
      *            operations, such as logging processing activity.
      */
-    @Override
-    public void removeDocument(String documentURI, String outputDescription, IOutputRemoveActivity activities)
+    
+    public void removeDocument(String documentURI, VersionContext outputDescription, IOutputRemoveActivity activities)
             throws ManifoldCFException, ServiceInterruption
     {
         Logging.connectors.info("SolrWrapper - Starting removing doc : " + documentURI);
@@ -284,8 +285,8 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
             outputConnectorPool.release(outputConnection, outputConnector);
 
         }
-
-        primaryConnector.removeDocument(documentURI, outputDescription, activities);
+        
+        primaryConnector.removeDocument(documentURI, outputDescription.getVersionString(), activities);
         outputConnectorPool.release(primaryConnection, primaryConnector);
 
         activities.recordActivity(null, REMOVE_ACTIVITY, null, documentURI, "OK", null);
@@ -313,7 +314,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      * @param outputConnector
      * @param childType
      */
-    private void removeChildren(String documentURI, String outputDescription,
+    private void removeChildren(String documentURI, VersionContext outputDescription,
             BaseOutputConnector primaryIndexConnector, BaseOutputConnector outputConnector, String childType,
             boolean removeDocURI)
     {
@@ -332,7 +333,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
                     RepositoryDocument removalUpdateRepoDoc = JSONRepositoryDocumentSerializer.createRepoDocFromJSON(
                             currentId, removalUpdateJSON.toString());
 
-                    outputConnector.addOrReplaceDocument(currentId, outputDescription, removalUpdateRepoDoc,
+                    outputConnector.addOrReplaceDocumentWithException(currentId, outputDescription, removalUpdateRepoDoc,
                             "authorityNameString", new EmptyOutputAddActivity()); // check the authorityNameString
                 }
                 catch (Exception e)
@@ -362,7 +363,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
         List<String> childrenIds = new ArrayList<String>();
         SolrDocumentList results = new SolrDocumentList();
 
-        HttpSolrServer solrServer = getHttpSolrServer(configuration);
+        HttpSolrClient solrServer = getHttpSolrServer(configuration);
 
         getQuery = new SolrQuery();
         getQuery.setRequestHandler("/get");
@@ -397,7 +398,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      * @param configuration
      * @return
      */
-    private HttpSolrServer getHttpSolrServer(ConfigParams configuration)
+    private HttpSolrClient getHttpSolrServer(ConfigParams configuration)
     {
         String serverProtocol = configuration.getParameter("Server protocol");
         String serverName = configuration.getParameter("Server name");
@@ -407,7 +408,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
 
         String httpSolrServerUrl = serverProtocol + "://" + serverName + ":" + serverPort + "/" + webapp + "/"
                 + serverCore;
-        return new HttpSolrServer(httpSolrServerUrl);
+        return new HttpSolrClient(httpSolrServerUrl);
     }
 
     /**
@@ -427,7 +428,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      * @return the document status (accepted or permanently rejected).
      */
     @Override
-    public int addOrReplaceDocument(String documentURI, String outputDescription, RepositoryDocument document,
+    public int addOrReplaceDocumentWithException(String documentURI, VersionContext outputDescription, RepositoryDocument document,
             String authorityNameString, IOutputAddActivity activities) throws ManifoldCFException, ServiceInterruption
     {
         boolean documentAcceptance = true;
@@ -465,7 +466,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
                     try
                     {
                         Logging.connectors.info("\n the repo doc being proccessed by Solrwrapper : " + documentURI);
-                        int acceptance = outputConnector.addOrReplaceDocument(documentURI, outputDescription, d,
+                        int acceptance = outputConnector.addOrReplaceDocumentWithException(documentURI, outputDescription, d,
                                 authorityNameString, activities);
                         if (acceptance == DOCUMENTSTATUS_REJECTED)
                             Logging.connectors.error("Error Ingesting Child Document : Rejected 468- " + documentURI);
@@ -493,7 +494,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
                             if (d.getFieldAsStrings(DOCUMENT_ID_FIELD) != null)
                                 id = d.getFieldAsStrings(DOCUMENT_ID_FIELD)[0];
                             Logging.connectors.info("\n the repo doc being proccessed by Solrwrapper : " + id);
-                            int acceptance = outputConnector.addOrReplaceDocument(id, outputDescription, d,
+                            int acceptance = outputConnector.addOrReplaceDocumentWithException(id, outputDescription, d,
                                     authorityNameString, activities);
                             if (acceptance == DOCUMENTSTATUS_REJECTED)
                                 Logging.connectors.error("Error Ingesting Child Document : Rejected 468- " + id);
@@ -561,7 +562,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      */
     private void removeEmptyOccurrences(ConfigParams configuration) throws IOException, SolrServerException
     {
-        HttpSolrServer httpSolrServer = this.getHttpSolrServer(configuration);
+        HttpSolrClient httpSolrServer = this.getHttpSolrServer(configuration);
         httpSolrServer.deleteByQuery(OCCURRENCES_FIELD + ":" + 0);
         httpSolrServer.commit();
     }

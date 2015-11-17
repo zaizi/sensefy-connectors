@@ -133,6 +133,5 @@ public class Messages extends org.apache.manifoldcf.ui.i18n.Messages
     outputResourceWithVelocity(output,Messages.class,DEFAULT_BUNDLE_NAME,DEFAULT_PATH_NAME,locale,resourceKey,
       contextObjects);
   }
-  
 }
 
