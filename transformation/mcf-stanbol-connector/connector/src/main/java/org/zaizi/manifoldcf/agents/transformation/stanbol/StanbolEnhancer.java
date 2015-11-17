@@ -143,9 +143,6 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     public boolean checkMimeTypeIndexable(VersionContext pipelineDescription, String mimeType,
             IOutputCheckActivity checkActivity) throws ManifoldCFException, ServiceInterruption
     {
-        // We should see what Tika will transform
-        // MHL
-        // Do a downstream check
         return checkActivity.checkMimeTypeIndexable("text/plain;charset=utf-8");
     }
 
@@ -603,7 +600,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         paramMap.put("TABNAME", tabName);
         paramMap.put("SEQNUM", Integer.toString(connectionSequenceNumber));
         paramMap.put("SELECTEDNUM", Integer.toString(actualSequenceNumber));
-
+        
         // Fill in the field mapping tab data
         fillInFieldMappingSpecificationMap(paramMap, os);
 
@@ -742,7 +739,12 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
         // Prep for field mappings
         List<Map<String, String>> fieldMappings = new ArrayList<Map<String, String>>();
+        //adding default Stanbol parameters to the the map
+        String server = STANBOL_ENDPOINT;
+        String chain = STANBOL_ENHANCEMENT_CHAIN;       
         String keepAllMetadataValue = "true";
+        
+        
         for (int i = 0; i < os.getChildCount(); i++)
         {
             SpecificationNode sn = os.getChild(i);
@@ -770,16 +772,17 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             }
             else if (sn.getType().equals(StanbolConfig.STANBOL_SERVER_VALUE))
             {
-                String server = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
-                paramMap.put("STANBOL_SERVER", server);
-
+                server = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);              
             }
             else if (sn.getType().equals(StanbolConfig.STANBOL_CHAIN_VALUE))
             {
-                String chain = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
-                paramMap.put("STANBOL_CHAIN", chain);
+                chain = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
+                
             }
         }
+        
+        paramMap.put("STANBOL_SERVER", server);
+        paramMap.put("STANBOL_CHAIN", chain);
         paramMap.put("FIELDMAPPINGS", fieldMappings);
         paramMap.put("KEEPALLMETADATA", keepAllMetadataValue);
 
