@@ -4,28 +4,35 @@
 Sensefy Connectors includes the following connectors
 
 ```
-1. authority/alfresco/alfresco-authority-connector
-2. output/mcf-solrwrapperconnector
-3. transformation/mcf-stanbol-connector
+1. output/mcf-solrwrapperconnector
+2. transformation/mcf-stanbol-connector
+3. authority/alfresco/alfresco-authority-connector (do not need to configure this with manifoldcf-2.2)
 ```
-
-In addition to connectors, this includes **authority/alfresco/alfresco-manifold** AMP file that needs to be installed in alfresco. 
 
 
 ## Building Connectors
 ---
 
-Build the connectors and the AMP file by running,
+In order to build the connectors, first need to download and build manifoldcf to intall the required dependancies.
+
+```
+git clone https://github.com/apache/manifoldcf.git
+cd manifoldcf/
+git checkout release-2.2-branch
+mvn clean install -Dmaven.test.skip=true
+```
+
+Build the connectors by running following command from sensefy-connectors directory,
 
 ```
 mvn clean install -DskipTests=true
 ```
 
-### Build Alfresco Indexer and Indexer AMP
+### Build Alfresco Indexer AMP
 
 ```
-git clone https://github.com/zaizi/alfresco-webscript-manifold-connector.git 
-cd alfresco-webscript-manifold-connector/
+git clone https://github.com/zaizi/alfresco-indexer
+cd alfresco-indexer/
 mvn clean install -DskipTests=true
 ```
 
@@ -34,7 +41,6 @@ This builds the followings
 ```
 1. alfresco-indexer-webscripts - AMP file to be installed in Alfresco
 2. alfresco-indexer-client - to be configure with ManifoldCF
-3. manifold-connector - to be configure with ManifoldCF
 ```
 
 ## Configuring Alfresco with AMP files
@@ -42,8 +48,8 @@ This builds the followings
 
 ```
 1. Copy alfresco-indexer-webscripts.amp in alfresco-webscript-manifold-connector/alfresco-indexer-webscripts/target/ to your $ALFRESCO_INSTALLATION_DIR/amps
-2. Copy alfresco-manifold.amp in sensefy-connectors/authority/alfresco/alfresco-manifold/target/ to your $ALFRESCO_INSTALLATION_DIR/amps
-3. To apply amp files to Alfresco, run following from $ALFRESCO_INSTALL_DIR
+
+2. To apply amp files to Alfresco, run following from $ALFRESCO_INSTALL_DIR
 ```
 
 ```
@@ -55,19 +61,15 @@ This builds the followings
 Add following connectors to **$MANIFOLD_INSTALL_DIR/connectors-lib**
 
 ```
-1. sensefy-connectors/authority/alfresco/alfresco-authority-connector/target/alfresco-authority-connector-1.0.jar
-2. sensefy-connectors/output/mcf-solrwrapperconnector/target/mcf-solrwrapperprocessorconnector-connector-1.8-SNAPSHOT.jar
-3. sensefy-connectors/transformation/mcf-stanbol-connector/target/mcf-stanbol-connector-1.8-SNAPSHOT-jar-with-dependencies.jar
-4. alfresco-webscript-manifold-connector/manifold-connector/target/manifold-connector-0.6.1-jar-with-dependencies.jar
+1. sensefy-connectors/output/mcf-solrwrapperconnector/target/mcf-solrwrapperprocessorconnector-connector-2.2.jar
+2. sensefy-connectors/transformation/mcf-stanbol-connector/target/mcf-stanbol-connector-2.2-jar-with-dependencies.jar
 ```
 
 Add following properties to **$MANIFOLD_INSTALL_DIR/connectors.xml**
 
 ```
-<authorityconnector name="Alfresco" class="org.apache.manifoldcf.authorities.authorities.alfresco.AlfrescoAuthorityConnector"/>
-<repositoryconnector name="Alfresco" class="org.alfresco.consulting.manifold.AlfrescoConnector"/>
-<transformationconnector name="Stanbol enhancer" class="org.apache.manifoldcf.agents.transformation.stanbol.StanbolEnhancer"/>
-<outputconnector name="Solr Wrapper" class="org.apache.manifoldcf.agents.output.solrwrapper.SolrWrapperConnector"/>
+<transformationconnector name="Stanbol enhancer" class="org.apache.manifoldcf.zaizi.transformation.stanbol.StanbolEnhancer"/>
+<outputconnector name="Solr Wrapper" class="org.zaizi.manifoldcf.agents.output.solrwrapper.SolrWrapperConnector"/>
 
 ```
 
