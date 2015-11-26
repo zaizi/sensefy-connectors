@@ -24,8 +24,6 @@
     <packaging>pom</packaging>
     
     <modules>
-        <module>authority/alfresco/alfresco-authority-connector</module>
-        <module>authority/alfresco/alfresco-manifold</module>
         <module>output/mcf-solrwrapperconnector</module>
         <module>transformation/mcf-stanbol-connector</module>
     </modules>
