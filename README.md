@@ -68,7 +68,7 @@ Add following connectors to **$MANIFOLD_INSTALL_DIR/connectors-lib**
 Add following properties to **$MANIFOLD_INSTALL_DIR/connectors.xml**
 
 ```
-<transformationconnector name="Stanbol enhancer" class="org.apache.manifoldcf.zaizi.transformation.stanbol.StanbolEnhancer"/>
+<transformationconnector name="Stanbol enhancer" class="org.zaizi.manifoldcf.agents.transformation.stanbol.StanbolEnhancer"/>
 <outputconnector name="Solr Wrapper" class="org.zaizi.manifoldcf.agents.output.solrwrapper.SolrWrapperConnector"/>
 
 ```
