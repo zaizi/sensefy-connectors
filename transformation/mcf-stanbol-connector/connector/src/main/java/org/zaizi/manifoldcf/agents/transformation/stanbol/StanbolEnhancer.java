@@ -318,32 +318,22 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                 // manually add some default properties for entities
                                 nextEntityJSON.put(LABEL_FIELD, ea.getEntityLabel());
                                 
-                                if (keepAllMetaData)
+                               
+                                //source mappings
+                                if (sourceTargets != null)
                                 {
-                                    // all property values are indexed in the entity object
-                                    Collection<String> entityProperties = entity.getProperties();
-                                    for (String property : entityProperties)
+                                    // map stanbol fields with solr fields
+                                    for (String stanbolField : sourceTargets.keySet())
                                     {
-                                        String localPropertyName = getURILocalName(property);
-                                        // filtering english label, name properties if language attribute is available
-                                        if (localPropertyName.equals(NAME_FIELD)
-                                                || localPropertyName.equals(LABEL_FIELD))
+                                        String solrField = sourceTargets.get(stanbolField);
+                                        Collection<String> fieldValues = entity.getPropertyValues(stanbolField);
+                                        if (fieldValues != null)
                                         {
-                                            Collection<String> englishLiteralValues = entity.getPropertyValuesByLanguage(property, "en");
-                                            if (englishLiteralValues != null)
-                                            {
-                                                nextEntityJSON.put(NAME_FIELD, englishLiteralValues);
-                                            }
+                                            nextEntityJSON.put(solrField, fieldValues);
                                         }
-                                        else
-                                        {
-                                            Collection<String> propValues = entity.getPropertyValues(property);
-                                            nextEntityJSON.put(localPropertyName, propValues);
-                                        }
-
                                     }
                                 }
-
+                                                                                               
                                 for (String typeURI : entity.getTypes())
                                 {
                                     String typeLiteral = getURILocalName(typeURI);
@@ -411,23 +401,35 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                                     }
 
                                 }
+                                
                                 // mark entity with the main types
                                 nextEntityJSON = markEntityBasedOnType(nextEntityJSON, typeLabels);
                                 // adding the type to the entity object
                                 nextEntityJSON.put(TYPE_FIELD, typeLabels);
                                
-                                // source mappings
-                                if (sourceTargets != null)
-                                {
-                                    // map stanbol fields with solr fields
-                                    for (String stanbolField : sourceTargets.keySet())
+                                if (keepAllMetaData)
+                                {                                                                      
+                                    // all property values are indexed in the entity object
+                                    Collection<String> entityProperties = entity.getProperties();
+                                    for (String property : entityProperties)
                                     {
-                                        String solrField = sourceTargets.get(stanbolField);
-                                        Collection<String> fieldValues = entity.getPropertyValues(stanbolField);
-                                        if (fieldValues != null)
+                                        String localPropertyName = getURILocalName(property);
+                                        // filtering english label, name properties if language attribute is available
+                                        if (localPropertyName.equals(NAME_FIELD)
+                                                || localPropertyName.equals(LABEL_FIELD))
                                         {
-                                            nextEntityJSON.put(solrField, fieldValues);
+                                            Collection<String> englishLiteralValues = entity.getPropertyValuesByLanguage(property, "en");
+                                            if (englishLiteralValues != null)
+                                            {
+                                                nextEntityJSON.put(NAME_FIELD, englishLiteralValues);
+                                            }
                                         }
+                                        else
+                                        {
+                                            Collection<String> propValues = entity.getPropertyValues(property);
+                                            nextEntityJSON.put(localPropertyName, propValues);
+                                        }
+
                                     }
                                 }
 
