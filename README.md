@@ -22,6 +22,15 @@ git checkout release-2.2-branch
 mvn clean install 
 ```
 
+Also need to build Zaizi Stanbol Clent
+
+```
+git clone https://github.com/zaizi/apache-stanbol-client.git
+cd apache-stanbol-client
+git checkout jaxrs-1.0
+mvn clean install -DskipTests=true
+```
+
 Build the connectors by running following command from sensefy-connectors directory,
 
 ```
