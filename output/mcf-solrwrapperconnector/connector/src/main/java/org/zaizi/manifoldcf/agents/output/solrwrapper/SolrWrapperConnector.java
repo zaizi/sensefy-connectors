@@ -244,8 +244,8 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      * @param activities is the handle to an object that the implementer of an output connector may use to perform
      *            operations, such as logging processing activity.
      */
-    
-    public void removeDocument(String documentURI, VersionContext outputDescription, IOutputRemoveActivity activities)
+    @Override
+    public void removeDocument(String documentURI, String outputDescription, IOutputRemoveActivity activities)
             throws ManifoldCFException, ServiceInterruption
     {
         Logging.connectors.info("SolrWrapper - Starting removing doc : " + documentURI);
@@ -286,7 +286,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
 
         }
         
-        primaryConnector.removeDocument(documentURI, outputDescription.getVersionString(), activities);
+        primaryConnector.removeDocument(documentURI, outputDescription, activities);
         outputConnectorPool.release(primaryConnection, primaryConnector);
 
         activities.recordActivity(null, REMOVE_ACTIVITY, null, documentURI, "OK", null);
@@ -314,7 +314,7 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
      * @param outputConnector
      * @param childType
      */
-    private void removeChildren(String documentURI, VersionContext outputDescription,
+    private void removeChildren(String documentURI, String outputDescription,
             BaseOutputConnector primaryIndexConnector, BaseOutputConnector outputConnector, String childType,
             boolean removeDocURI)
     {
@@ -333,7 +333,8 @@ public class SolrWrapperConnector extends org.apache.manifoldcf.agents.output.Ba
                     RepositoryDocument removalUpdateRepoDoc = JSONRepositoryDocumentSerializer.createRepoDocFromJSON(
                             currentId, removalUpdateJSON.toString());
 
-                    outputConnector.addOrReplaceDocumentWithException(currentId, outputDescription, removalUpdateRepoDoc,
+                    VersionContext versionContex = new VersionContext(outputDescription, params, new Specification());
+                    outputConnector.addOrReplaceDocumentWithException(currentId, versionContex, removalUpdateRepoDoc,
                             "authorityNameString", new EmptyOutputAddActivity()); // check the authorityNameString
                 }
                 catch (Exception e)
