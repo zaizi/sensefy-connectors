@@ -32,6 +32,14 @@
   	</td>
   </tr>
   
+   <tr><td class="separator" colspan="2"><hr/></td></tr>
+   <tr>
+    <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.LDPath'))</nobr></td>
+    <td class="value">
+  		<input type="text" name="s${SEQNUM}_stanbol_ldpath" size="256" value="$Encoder.attributeEscape($STANBOL_LDPATH)"/>
+  	</td>
+  </tr>
+  
   <!--added for field mappings  -->
     <tr><td class="separator" colspan="2"><hr/></td></tr>
     <tr>
@@ -92,21 +100,8 @@
         </tr>
       </table>
     </td>
-  </tr>
-  
-  <tr><td class="separator" colspan="2"><hr/></td></tr>
-  
-  <tr>
-    <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.KeepAllMetadata'))</nobr></td>
-    <td class="value">
-  #if($KEEPALLMETADATA == 'true')
-       <input type="checkbox" checked="true" name="s${SEQNUM}_keepallmetadata" value="true"/>
-  #else
-       <input type="checkbox" name="s${SEQNUM}_keepallmetadata" value="true"/>
-  #end
-    </td>
-  </tr>
-  
+  </tr> 
+  <tr><td class="separator" colspan="2"><hr/></td></tr> 
 </table>
 
 #else
@@ -120,5 +115,5 @@
 <input type="hidden" name="s${SEQNUM}_fieldmapping_count" value="$fieldcounter"/>  
 <input type="hidden" name="s${SEQNUM}_stanbol_url" value="$Encoder.bodyEscape($STANBOL_SERVER)"/>
 <input type="hidden" name="s${SEQNUM}_stanbol_chain" value="$Encoder.bodyEscape($STANBOL_CHAIN)"/>
-<input type="hidden" name="s${SEQNUM}_keepallmetadata" value="$Encoder.bodyEscape($KEEPALLMETADATA)"/>
+<input type="hidden" name="s${SEQNUM}_stanbol_ldpath" value="$Encoder.bodyEscape($STANBOL_LDPATH)"/>
 #end
