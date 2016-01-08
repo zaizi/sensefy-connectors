@@ -18,7 +18,7 @@ In order to build the connectors, first need to download and build manifoldcf to
 ```
 git clone https://github.com/apache/manifoldcf.git
 cd manifoldcf/
-git checkout release-2.2-branch
+git checkout release-2.3-branch
 mvn clean install 
 ```
 
