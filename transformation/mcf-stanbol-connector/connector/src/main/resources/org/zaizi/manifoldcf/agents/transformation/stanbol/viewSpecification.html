@@ -16,8 +16,6 @@
 -->
 
 <table class="displaytable">
-  <tr><td class="separator" colspan="2"><hr/></td></tr>
-  <tr><td class="separator" colspan="2"><hr/></td></tr>
    <tr>
     <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.ServerFieldName'))</nobr></td>
     <td class="value"><nobr>$Encoder.attributeEscape($STANBOL_SERVER)</nobr></td>
@@ -28,13 +26,7 @@
     <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.EnhancementChainName'))</nobr></td>
     <td class="value"><nobr>$Encoder.attributeEscape($STANBOL_CHAIN)</nobr></td>
   </tr>
-  
-  <tr><td class="separator" colspan="2"><hr/></td></tr>
-   <tr>
-    <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.LDPath'))</nobr></td>
-    <td class="value"><nobr>$Encoder.attributeEscape($STANBOL_LDPATH)</nobr></td>
-  </tr>
-  
+    
   <tr><td class="separator" colspan="2"><hr/></td></tr>  
   <tr>
     <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.FieldMappings'))</nobr></td>
@@ -42,7 +34,6 @@
       <table class="formtable">
         <tr class="formheaderrow">
           <td class="formcolumnheader"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.MetadataFieldName'))</nobr></td>
-          <td class="formcolumnheader"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.FinalFieldName'))</nobr></td>
         </tr>
 #set($fieldcounter = 0)
 #foreach($fieldmapping in $FIELDMAPPINGS)
@@ -54,9 +45,6 @@
           <td class="formcolumncell">
             <nobr>$Encoder.bodyEscape($fieldmapping.get('SOURCE'))</nobr>
           </td>
-          <td class="formcolumncell">
-            <nobr>$Encoder.bodyEscape($fieldmapping.get('TARGETDISPLAY'))</nobr>
-          </td>
         </tr>
   #set($fieldcounter = $fieldcounter + 1)
 #end
@@ -65,6 +53,78 @@
 #end
       </table>
     </td>
+  </tr>
+   
+ <!--LDPath prefix mappings --> 
+  <tr><td class="separator" colspan="2"><hr/></td></tr>  
+  <tr>
+    <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.LDPathPrefixMappings'))</nobr></td>
+    <td class="boxcell">
+      <table class="formtable">
+        <tr class="formheaderrow">
+          <td class="formcolumnheader"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.LDpathPrefix'))</nobr></td>
+          <td class="formcolumnheader"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.LDpathFieldURI'))</nobr></td>
+        </tr>
+#set($prefixcounter = 0)
+#foreach($prefixmapping in $PREFIXMAPPINGS)
+  #if(($prefixcounter % 2) == 0)
+        <tr class="evenformrow">
+  #else
+        <tr class="oddformrow">
+  #end
+          <td class="formcolumncell">
+            <nobr>$Encoder.bodyEscape($prefixmapping.get('SOURCE'))</nobr>
+          </td>
+          <td class="formcolumncell">
+            <nobr>$Encoder.bodyEscape($prefixmapping.get('TARGET'))</nobr>
+          </td>
+        </tr>
+  #set($prefixcounter = $prefixcounter + 1)
+#end
+#if($prefixcounter == 0)
+        <tr class="formrow"><td class="formmessage"colspan="2">$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.NoFieldMappingSpecified'))</td></tr>
+#end
+      </table>
+    </td>
+  </tr> 
+
+   <!--Final Field mappings --> 
+  <tr><td class="separator" colspan="2"><hr/></td></tr>  
+  <tr>
+    <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.DocumentFieldMappings'))</nobr></td>
+    <td class="boxcell">
+      <table class="formtable">
+        <tr class="formheaderrow">
+          <td class="formcolumnheader"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.EntityFieldName'))</nobr></td>
+          <td class="formcolumnheader"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.DestinationFieldName'))</nobr></td>
+        </tr>
+#set($doccounter = 0)
+#foreach($docmapping in $DOCMAPPINGS)
+  #if(($doccounter % 2) == 0)
+        <tr class="evenformrow">
+  #else
+        <tr class="oddformrow">
+  #end
+          <td class="formcolumncell">
+            <nobr>$Encoder.bodyEscape($docmapping.get('SOURCE'))</nobr>
+          </td>
+          <td class="formcolumncell">
+            <nobr>$Encoder.bodyEscape($docmapping.get('TARGET'))</nobr>
+          </td>
+        </tr>
+  #set($doccounter = $doccounter + 1)
+#end
+#if($doccounter == 0)
+        <tr class="formrow"><td class="formmessage"colspan="2">$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.NoFieldMappingSpecified'))</td></tr>
+#end
+      </table>
+    </td>
+  </tr> 
+
+  <tr><td class="separator" colspan="2"><hr/></td></tr>
+  <tr>
+    <td class="description"><nobr>$Encoder.bodyEscape($ResourceBundle.getString('StanbolEnhancer.KeepAllMetadata'))</nobr></td>
+    <td class="value"><nobr>$Encoder.bodyEscape($KEEPALLMETADATA)</nobr></td>
   </tr>
     
 </table>

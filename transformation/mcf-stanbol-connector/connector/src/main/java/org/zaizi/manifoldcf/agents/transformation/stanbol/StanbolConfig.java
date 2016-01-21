@@ -27,11 +27,15 @@ public class StanbolConfig {
   public static final String STANBOL_SERVER_VALUE = "stanbol_server";
   public static final String STANBOL_CHAIN_VALUE = "stanbol_chain";
   
-  public static final String STANBOL_LDPATH = "ldpath"; 
-  
-  public static final String NODE_FIELDMAP = "fieldmap";
+  public static final String NODE_FIELDMAP = "fieldList";
   public static final String NODE_KEEPMETADATA = "keepAllMetadata";
+  
   public static final String ATTRIBUTE_SOURCE = "source";
   public static final String ATTRIBUTE_TARGET = "target";
+  
+  public static final String PREFIX_MAP = "ldpathprefixMap";
+  public static final String LDPATH_FIELD_MAP = "ldpathfieldMap";
+  public static final String DOC_FIELD_MAP = "docfieldMap";
+  
     
 }

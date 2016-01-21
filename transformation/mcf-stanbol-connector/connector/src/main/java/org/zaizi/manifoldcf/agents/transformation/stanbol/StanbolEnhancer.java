@@ -16,7 +16,6 @@ package org.zaizi.manifoldcf.agents.transformation.stanbol;
  **/
 
 import org.apache.commons.io.IOUtils;
-import org.apache.commons.validator.routines.UrlValidator;
 import org.apache.manifoldcf.core.interfaces.*;
 import org.apache.manifoldcf.agents.interfaces.*;
 import org.apache.manifoldcf.agents.system.Logging;
@@ -27,16 +26,13 @@ import org.apache.stanbol.client.enhancer.model.EnhancementStructure;
 import org.apache.stanbol.client.enhancer.model.EntityAnnotation;
 import org.apache.stanbol.client.enhancer.model.TextAnnotation;
 import org.apache.stanbol.client.entityhub.model.Entity;
+import org.apache.stanbol.client.entityhub.model.LDPathProgram;
+import org.apache.stanbol.client.exception.StanbolClientException;
 import org.apache.stanbol.client.services.exception.StanbolServiceException;
 
 import java.io.*;
-import java.net.URI;
 import java.util.*;
 
-import org.json.JSONArray;
-import org.json.JSONException;
-import org.json.JSONObject;
-import org.openrdf.model.impl.URIImpl;
 
 /**
  * Stanbol Enhancer transformation connector
@@ -53,6 +49,8 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
 
     private static final String STANBOL_ENDPOINT = "http://localhost:8080/";
     private static final String STANBOL_ENHANCEMENT_CHAIN = "default";
+    
+    private static final String customLDPathPrefix =  " http://manifoldcf.apache.org/custom/";
     /**
      * DOCUMENTS' FIELDS
      */
@@ -185,11 +183,18 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         // stanbol server url
         String stanbolServer = sp.getStanbolServer();
         String chain = sp.getStanbolChain();
-
+       
         // Stanbol entity dereference fields
-        Map<String, String> derefFields = sp.getDereferenceFields();
-        String ldPath = sp.getLDPath();
+        List<String> derefFields = sp.getDereferenceFields();       
 
+        //ldpath prefix: Namespace URI
+        Map<String,String> prefixMap = sp.getLdPathPrefixes();
+        //ldpath fieldName:field definition 
+        Map<String,String> ldpathFieldMap = sp.getLdPathFields();
+        //entity property URI: document field
+        Map<String,String> docFieldMap = sp.getDocumentFieldMapinngs();
+        boolean isKeepAllEntityMetadata = sp.keepAllMetadata();
+      
         stanbolFactory = new StanbolClientFactory(stanbolServer);
 
         // Extracting Content.
@@ -198,26 +203,49 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         String content = new String(copy);
 
         Set<String> uris = new HashSet<String>();
+        //field URI: field values set
         Map<String, Set<String>> entityPropertyMap = new HashMap<String, Set<String>>();
         Enhancer enhancerClient = null;
         EnhancementStructure eRes = null;
         // Create a copy of Repository Document
         RepositoryDocument docCopy = document.duplicate();
         docCopy.setBinary(new ByteArrayInputStream(copy), length);
+        
+        LDPathProgram ldpathProgram = null;
 
         try
         {
             enhancerClient = stanbolFactory.createEnhancerClient();
             EnhancerParameters parameters = null;
-            // ldpath program is given priority if it's set
-            if (ldPath != null)
+            // ldpath program is given priority if it's set          
+            if((ldpathFieldMap != null && !ldpathFieldMap.isEmpty()))
             {
-                parameters = EnhancerParameters.builder().setChain(chain).setContent(content).setLDpathProgram(ldPath).build();
+                ldpathProgram = new LDPathProgram(); 
+                for(String prefix: prefixMap.keySet())
+                {
+                    ldpathProgram.addNamespace(prefix, prefixMap.get(prefix));                
+                }
+                for(String ldpathField: ldpathFieldMap.keySet())
+                {
+                    if(ldpathField.indexOf(":") != -1)
+                    {
+                        int prefixIndex = ldpathField.indexOf(":");
+                        String prefix = ldpathField.substring(0, prefixIndex);
+                        //retrieving namespace for the field
+                        String fieldName = ldpathField.substring(prefixIndex+1); 
+                        ldpathProgram.addFieldDefinition(prefix, fieldName, ldpathFieldMap.get(ldpathField));
+                    }
+                    else
+                    {       
+                        ldpathProgram.addFieldDefinition(customLDPathPrefix,ldpathField, ldpathFieldMap.get(ldpathField));
+                    }
+                }  
+                parameters = EnhancerParameters.builder().setChain(chain).setContent(content).setLDpathProgram(ldpathProgram.toString()).build();
             }
             else if (!derefFields.isEmpty())
             {
                 parameters = EnhancerParameters.builder().setChain(chain).setContent(content).setDereferencingFields(
-                        derefFields.keySet()).build();
+                        derefFields).build();
             }
             else
             {
@@ -226,7 +254,7 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             eRes = enhancerClient.enhance(parameters);
 
         }
-        catch (StanbolServiceException e)
+        catch (StanbolServiceException | StanbolClientException e)
         {
             Logging.agents.error("Error occurred while performing Stanbol enhancement for document : " + documentURI, e);
             resultCode = "STANBOL_ENHANCEMENT_FAIL";
@@ -238,63 +266,133 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                     description);
 
         }
-        if (eRes == null)
-        {
-            // if no enhancement result is received, cannot enhance document, hence reject it
-            return DOCUMENTSTATUS_REJECTED;
-        }
-        else
-        {
-            // processing the text annotations extracted by Stanbol
-            for (TextAnnotation ta : eRes.getTextAnnotations())
-            {
-                Logging.agents.debug("Processing text annotation for content : " + ta.getUri());
-                // need to disambiguate the entity-annotations returned
-                for (EntityAnnotation ea : eRes.getEntityAnnotations(ta))
-                {
-                    double confidence = ea.getConfidence();
-                    Logging.agents.debug("Processing entity annotation for content : " + ea.getUri() + " confidence : "
-                            + confidence);
-                    if (confidence < DEFAULT_DISAMBIGUATION_SCORE)
-                    {
-                        Logging.agents.debug("Confidence for the entity annotation is below the threshold, hence not processing the entity annotation");
-                    }
-                    else
-                    {
-                        Entity entity = null;
-                        uris.add(ea.getEntityReference());
-                        // dereference the entity
-                        entity = ea.getDereferencedEntity();
-                        if (entity != null)
-                        {
-                            Collection<String> properties = entity.getProperties();
-                            for (String property : properties)
-                            {
-                                String targetFieldName = derefFields.get(property);
-                                Set<String> propValues = entityPropertyMap.get(targetFieldName);
 
-                                if (propValues == null)
+        // processing the text annotations extracted by Stanbol
+        for (TextAnnotation ta : eRes.getTextAnnotations())
+        {
+            Logging.agents.debug("Processing text annotation for content : " + ta.getUri());
+            // need to disambiguate the entity-annotations returned
+            for (EntityAnnotation ea : eRes.getEntityAnnotations(ta))
+            {
+                double confidence = ea.getConfidence();
+                Logging.agents.debug("Processing entity annotation for content : " + ea.getUri() + " confidence : "
+                        + confidence);
+                if (confidence < DEFAULT_DISAMBIGUATION_SCORE)
+                {
+                    Logging.agents.debug("Confidence for the entity annotation is below the threshold, hence not processing the entity annotation");
+                }
+                else
+                {
+                    Entity entity = null;
+                    uris.add(ea.getEntityReference());
+                    // dereference the entity
+                    entity = ea.getDereferencedEntity();
+                    if (entity != null)
+                    {                                              
+                        //process LDPath fields  
+                        if(ldpathProgram != null)
+                        {
+                            //process the ldpath fields in order to retrieve it from the entity
+                            for(String ldpathField : ldpathFieldMap.keySet())
+                            {
+                                if(ldpathField.indexOf(":") != -1)
+                                {                                   
+                                    int prefixIndex = ldpathField.indexOf(":");
+                                    String prefix = ldpathField.substring(0, prefixIndex);
+                                    //retrieving namespace for the field
+                                    String namespace =  prefixMap.get(prefix);
+                                    String fieldName = ldpathField.substring(prefixIndex+1); 
+                                    if(namespace != null)
+                                    {
+                                        if(!namespace.endsWith("/"))
+                                        {
+                                            ldpathField = namespace + "/" + fieldName;
+                                        }
+                                        else 
+                                        {
+                                            ldpathField = namespace + fieldName;
+                                        }                                        
+                                    }
+                                    else 
+                                    {
+                                        ldpathField = customLDPathPrefix + "/" + fieldName;
+                                    }                                   
+                                }
+                                else
+                                {
+                                    //no name space defined, hence adding the custom namespace as default namespace
+                                    ldpathField = customLDPathPrefix + "/" + ldpathField;
+                                }
+                                //extracting field properties from the entity
+                                Collection<String> entityPropValues = entity.getPropertyValues(ldpathField);
+                                Set<String> propValues = entityPropertyMap.get(ldpathField);
+                                if(propValues == null)
                                 {
                                     propValues = new HashSet<String>();
                                 }
-                                Collection<String> entityPropValues = entity.getPropertyValues(property);
                                 propValues.addAll(entityPropValues);
-                                entityPropertyMap.put(targetFieldName, propValues);
+                                entityPropertyMap.put(ldpathField, propValues);   
                             }
+                            
                         }
+                        
+                        //processing dereference fields
+                        if(derefFields != null && !derefFields.isEmpty())
+                        {
+                            for(String field : derefFields)
+                            {                              
+                                Collection<String> entityPropValues = entity.getPropertyValues(field);
+                                Set<String> propValues = entityPropertyMap.get(field);
+                                if(propValues == null)
+                                {
+                                    propValues = new HashSet<String>();
+                                }
+                                propValues.addAll(entityPropValues);
+                                entityPropertyMap.put(field, propValues);                           
+                            }    
+                        }
+                        else if(isKeepAllEntityMetadata)
+                        {
+                            //adding all entity properties to the entityPropertyMap 
+                            Collection<String> entityProperties = entity.getProperties();
+                            for(String field : entityProperties)
+                            {
+                                Collection<String> entityPropValues = entity.getPropertyValues(field);
+                                Set<String> propValues = entityPropertyMap.get(field);
+                                if(propValues == null)
+                                {
+                                    propValues = new HashSet<String>();
+                                }
+                                propValues.addAll(entityPropValues);
+                                entityPropertyMap.put(field, propValues);  
+                            }                                                       
+                        }
+                    
                     }
                 }
             }
-
-            // Enrichment complete!
-            docCopy.addField(ENTITY_URI_FIELD, uris.toArray(new String[uris.size()]));
-            // adding all entity properties and values into the document
-            for (String property : entityPropertyMap.keySet())
-            {
-                Set<String> propertyValues = entityPropertyMap.get(property);
-                docCopy.addField(property, propertyValues.toArray(new String[propertyValues.size()]));
-            }
         }
+
+        // Enrichment complete!
+        docCopy.addField(ENTITY_URI_FIELD, uris.toArray(new String[uris.size()]));
+        // adding all entity properties and values into the document for the defined destination field 
+        for (String propertyURI : entityPropertyMap.keySet())
+        {
+            Set<String> propertyValues = entityPropertyMap.get(propertyURI);          
+            String destFieldName = null;  
+          
+            if(docFieldMap!= null)
+            {
+                destFieldName = docFieldMap.get(propertyURI);                  
+            }
+            //if no destination field is defined, the entity property URI is added as the field   
+            if(destFieldName == null)
+            {
+                destFieldName = propertyURI;
+            }
+            docCopy.addField(destFieldName, propertyValues.toArray(new String[propertyValues.size()]));
+        }
+
         // Send new document downstream
         int rval = activities.sendDocument(documentURI, docCopy);
         resultCode = (rval == DOCUMENTSTATUS_ACCEPTED) ? "ACCEPTED" : "REJECTED";
@@ -397,9 +495,8 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     {
         String seqPrefix = "s" + connectionSequenceNumber + "_";
 
-        // added for attrib mappings
+        //added for attrib mappings
         String x;
-
         x = variableContext.getParameter(seqPrefix + "fieldmapping_count");
         if (x != null && x.length() > 0)
         {
@@ -408,8 +505,8 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             while (i < os.getChildCount())
             {
                 SpecificationNode node = os.getChild(i);
-                if (node.getType().equals(StanbolConfig.NODE_FIELDMAP)
-                        || node.getType().equals(StanbolConfig.NODE_KEEPMETADATA))
+                if (node.getType().equals(StanbolConfig.NODE_FIELDMAP))
+//                        || node.getType().equals(StanbolConfig.NODE_KEEPMETADATA))
                     os.removeChild(i);
                 else
                     i++;
@@ -424,16 +521,9 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                 if (op == null || !op.equals("Delete"))
                 {
                     // Gather the fieldmap etc.
-                    String source = variableContext.getParameter(prefix + "source" + suffix);
-                    String target = variableContext.getParameter(prefix + "target" + suffix);
-                    if (target == null)
-                    {
-                        target = source;
-                    }
-
+                    String source = variableContext.getParameter(prefix + "source" + suffix);                  
                     SpecificationNode node = new SpecificationNode(StanbolConfig.NODE_FIELDMAP);
                     node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
-                    node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
                     os.addChild(os.getChildCount(), node);
                 }
                 i++;
@@ -442,19 +532,183 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             String addop = variableContext.getParameter(seqPrefix + "fieldmapping_op");
             if (addop != null && addop.equals("Add"))
             {
-                String source = variableContext.getParameter(seqPrefix + "fieldmapping_source");
-                String target = variableContext.getParameter(seqPrefix + "fieldmapping_target");
+                String source = variableContext.getParameter(seqPrefix + "fieldmapping_source");               
+                SpecificationNode node = new SpecificationNode(StanbolConfig.NODE_FIELDMAP);
+                node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);             
+                os.addChild(os.getChildCount(), node);
+            }
+        }
+        
+        //ldpath prefix mappings
+        String y;
+        y = variableContext.getParameter(seqPrefix + "prefixmapping_count");
+        if (y != null && y.length() > 0)
+        {
+            // About to gather the fieldmapping nodes, so get rid of the old ones.
+            int i = 0;
+            while (i < os.getChildCount())
+            {
+                SpecificationNode node = os.getChild(i);
+                if (node.getType().equals(StanbolConfig.PREFIX_MAP))
+                    os.removeChild(i);
+                else
+                    i++;
+            }
+            int count = Integer.parseInt(y);
+            i = 0;
+            while (i < count)
+            {
+                String prefix = seqPrefix + "prefixmapping_";
+                String suffix = "_" + Integer.toString(i);
+                String op = variableContext.getParameter(prefix + "op" + suffix);
+                if (op == null || !op.equals("Delete"))
+                {
+                    // Gather the fieldmap etc.
+                    String source = variableContext.getParameter(prefix + "source" + suffix);
+                    String target = variableContext.getParameter(prefix + "target" + suffix);
+                    if (target == null)
+                    {
+                        target = source;
+                    }
+
+                    SpecificationNode node = new SpecificationNode(StanbolConfig.PREFIX_MAP);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
+                    os.addChild(os.getChildCount(), node);
+                }
+                i++;
+            }
+
+            String addop = variableContext.getParameter(seqPrefix + "prefixmapping_op");
+            if (addop != null && addop.equals("Add"))
+            {
+                String source = variableContext.getParameter(seqPrefix + "prefixmapping_source");
+                String target = variableContext.getParameter(seqPrefix + "prefixmapping_target");
                 if (target == null)
                 {
                     target = source;
                 }
-                SpecificationNode node = new SpecificationNode(StanbolConfig.NODE_FIELDMAP);
+                SpecificationNode node = new SpecificationNode(StanbolConfig.PREFIX_MAP);
                 node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
                 node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
                 os.addChild(os.getChildCount(), node);
             }
         }
+        
+        
+        //ldpath field mappings
+        String z;
+        z = variableContext.getParameter(seqPrefix + "ldpathfieldmapping_count");
+        if (z != null && z.length() > 0)
+        {
+            // About to gather the ldpath field mapping nodes, so get rid of the old ones.
+            int i = 0;
+            while (i < os.getChildCount())
+            {
+                SpecificationNode node = os.getChild(i);
+                if (node.getType().equals(StanbolConfig.LDPATH_FIELD_MAP))
+                    os.removeChild(i);
+                else
+                    i++;
+            }
+            int count = Integer.parseInt(z);
+            i = 0;
+            while (i < count)
+            {
+                String prefix = seqPrefix + "ldpathfieldmapping_";
+                String suffix = "_" + Integer.toString(i);
+                String op = variableContext.getParameter(prefix + "op" + suffix);
+                if (op == null || !op.equals("Delete"))
+                {
+                    // Gather the fieldmap etc.
+                    String source = variableContext.getParameter(prefix + "source" + suffix);
+                    String target = variableContext.getParameter(prefix + "target" + suffix);
+                    if (target == null)
+                    {
+                        target = source;
+                    }
 
+                    SpecificationNode node = new SpecificationNode(StanbolConfig.LDPATH_FIELD_MAP);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
+                    os.addChild(os.getChildCount(), node);
+                }
+                i++;
+            }
+
+            String addop = variableContext.getParameter(seqPrefix + "ldpathfieldmapping_op");
+            if (addop != null && addop.equals("Add"))
+            {
+                String source = variableContext.getParameter(seqPrefix + "ldpathfieldmapping_source");
+                String target = variableContext.getParameter(seqPrefix + "ldpathfieldmapping_target");
+                if (target == null)
+                {
+                    target = source;
+                }
+                SpecificationNode node = new SpecificationNode(StanbolConfig.LDPATH_FIELD_MAP);
+                node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
+                node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
+                os.addChild(os.getChildCount(), node);
+            }
+        }
+        
+        //doc field mappings
+        String n;
+        n = variableContext.getParameter(seqPrefix + "docfieldmapping_count");
+        if (n != null && n.length() > 0)
+        {
+            // About to gather the document field mapping nodes, so get rid of the old ones.
+            int i = 0;
+            while (i < os.getChildCount())
+            {
+                SpecificationNode node = os.getChild(i);
+                if (node.getType().equals(StanbolConfig.DOC_FIELD_MAP))
+                    os.removeChild(i);
+                else
+                    i++;
+            }
+            int count = Integer.parseInt(n);
+            i = 0;
+            while (i < count)
+            {
+                String prefix = seqPrefix + "docfieldmapping_";
+                String suffix = "_" + Integer.toString(i);
+                String op = variableContext.getParameter(prefix + "op" + suffix);
+                if (op == null || !op.equals("Delete"))
+                {
+                    // Gather the fieldmap etc.
+                    String source = variableContext.getParameter(prefix + "source" + suffix);
+                    String target = variableContext.getParameter(prefix + "target" + suffix);
+                    if (target == null)
+                    {
+                        target = source;
+                    }
+                    
+                    SpecificationNode node = new SpecificationNode(StanbolConfig.DOC_FIELD_MAP);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
+                    node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
+                    os.addChild(os.getChildCount(), node);
+                }
+                i++;
+            }
+
+            String addop = variableContext.getParameter(seqPrefix + "docfieldmapping_op");
+            if (addop != null && addop.equals("Add"))
+            {
+                String source = variableContext.getParameter(seqPrefix + "docfieldmapping_source");
+                String target = variableContext.getParameter(seqPrefix + "docfieldmapping_target");
+                if (target == null)
+                {
+                    target = source;
+                }
+                               
+                SpecificationNode node = new SpecificationNode(StanbolConfig.DOC_FIELD_MAP);
+                node.setAttribute(StanbolConfig.ATTRIBUTE_SOURCE, source);
+                node.setAttribute(StanbolConfig.ATTRIBUTE_TARGET, target);
+                os.addChild(os.getChildCount(), node);
+            }
+        }
+        
         String stanbolURLValue = variableContext.getParameter(seqPrefix + "stanbol_url");
         if (stanbolURLValue == null || stanbolURLValue.equalsIgnoreCase(""))
             stanbolURLValue = STANBOL_ENDPOINT;
@@ -470,14 +724,19 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
         SpecificationNode chainNode = new SpecificationNode(StanbolConfig.STANBOL_CHAIN_VALUE);
         chainNode.setAttribute(StanbolConfig.ATTRIBUTE_VALUE, stanbolChainValue);
         os.addChild(os.getChildCount(), chainNode);
-
-        String stanbolLdpath = variableContext.getParameter(seqPrefix + "stanbol_ldpath");
-        if (stanbolLdpath != null && !stanbolLdpath.equals(""))
+        
+        // Gather the keep all metadata parameter to be the last one
+        String keepAll = variableContext.getParameter(seqPrefix + "keepallmetadata");
+        SpecificationNode keepAllDataNode = new SpecificationNode(StanbolConfig.NODE_KEEPMETADATA);       
+        if (keepAll != null)
         {
-            SpecificationNode ldPathNode = new SpecificationNode(StanbolConfig.STANBOL_LDPATH);
-            ldPathNode.setAttribute(StanbolConfig.ATTRIBUTE_VALUE, stanbolLdpath);
-            os.addChild(os.getChildCount(), ldPathNode);
+          keepAllDataNode.setAttribute(StanbolConfig.ATTRIBUTE_VALUE, keepAll);
         }
+        else
+        {
+          keepAllDataNode.setAttribute(StanbolConfig.ATTRIBUTE_VALUE, "false");
+        }
+        os.addChild(os.getChildCount(), keepAllDataNode);
 
         return null;
     }
@@ -508,33 +767,30 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
     protected static void fillInFieldMappingSpecificationMap(Map<String, Object> paramMap, Specification os)
     {
         // Prep for field mappings
-        List<Map<String, String>> fieldMappings = new ArrayList<Map<String, String>>();
+        List<Map<String,String>> dereferenceFields = new ArrayList<Map<String,String>>();
+        //List<prefix:prefixURI>
+        List<Map<String,String>> prefixMappings = new ArrayList<Map<String,String>>();
+        //List<ldpathField:fieldURI>
+        List<Map<String,String>> ldpathFieldsMappings = new ArrayList<Map<String,String>>();
+        //List<EntityProperty:Doc Field>
+        List<Map<String,String>> docFieldMappings = new ArrayList<Map<String,String>>();
+
+
         // adding default Stanbol parameters to the the map
         String server = STANBOL_ENDPOINT;
         String chain = STANBOL_ENHANCEMENT_CHAIN;
-        String ldpath = "";
-
+        String keepAllMetadataValue = "true";
+        
         for (int i = 0; i < os.getChildCount(); i++)
         {
             SpecificationNode sn = os.getChild(i);
             if (sn.getType().equals(StanbolConfig.NODE_FIELDMAP))
             {
                 String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
-                String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
-                String targetDisplay;
-                if (target == null)
-                {
-                    // if destination field name is not given, the destination field name is the source field name by
-                    // default
-                    target = source;
-                }
-                targetDisplay = target;
 
-                Map<String, String> fieldMapping = new HashMap<String, String>();
+                Map<String,String> fieldMapping = new HashMap<String,String>();
                 fieldMapping.put("SOURCE", source);
-                fieldMapping.put("TARGET", target);
-                fieldMapping.put("TARGETDISPLAY", targetDisplay);
-                fieldMappings.add(fieldMapping);
+                dereferenceFields.add(fieldMapping);
             }
             else if (sn.getType().equals(StanbolConfig.STANBOL_SERVER_VALUE))
             {
@@ -544,33 +800,77 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             {
                 chain = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
 
-            }
-            else if (sn.getType().equals(StanbolConfig.STANBOL_LDPATH))
+            }            
+            else if (sn.getType().equals(StanbolConfig.PREFIX_MAP))
             {
-                ldpath = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
+                String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
+
+                Map<String, String> prefixMapping = new HashMap<String, String>();
+                prefixMapping.put("SOURCE", source);
+                prefixMapping.put("TARGET", target);
+                prefixMappings.add(prefixMapping);
+            }
+            else if (sn.getType().equals(StanbolConfig.LDPATH_FIELD_MAP))
+            {
+                String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
+
+                Map<String, String> ldpathFieldsMapping = new HashMap<String, String>();
+                ldpathFieldsMapping.put("SOURCE", source);
+                ldpathFieldsMapping.put("TARGET", target);
+                ldpathFieldsMappings.add(ldpathFieldsMapping);
+            }
+            else if (sn.getType().equals(StanbolConfig.DOC_FIELD_MAP))
+            {
+                String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
+
+                Map<String, String> docFieldsMapping = new HashMap<String, String>();
+                docFieldsMapping.put("SOURCE", source);
+                docFieldsMapping.put("TARGET", target);
+                docFieldMappings.add(docFieldsMapping);
+            }
+            else if (sn.getType().equals(StanbolConfig.NODE_KEEPMETADATA))
+            {
+              keepAllMetadataValue = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
             }
         }
 
         paramMap.put("STANBOL_SERVER", server);
         paramMap.put("STANBOL_CHAIN", chain);
-        paramMap.put("STANBOL_LDPATH", ldpath);
-        paramMap.put("FIELDMAPPINGS", fieldMappings);
+        paramMap.put("FIELDMAPPINGS", dereferenceFields);
+        
+        //ldpath related params
+        paramMap.put("PREFIXMAPPINGS", prefixMappings);
+        paramMap.put("LDPATHFIELDMAPPINGS", ldpathFieldsMappings);
+        
+        paramMap.put("DOCMAPPINGS", docFieldMappings);
+        paramMap.put("KEEPALLMETADATA",keepAllMetadataValue);
     }
 
+    
     protected static class SpecPacker
     {
         private final String stanbolServer;
         private final String stanbolChain;
-        private final Map<String, String> dereferenceFields = new HashMap<String, String>();
-        private final String ldpath;
+        private final List<String> dereferenceFields = new ArrayList<String>();
+        
+        //prefix:prefix URI
+        private final Map<String,String> ldPathPrefixes = new HashMap<String, String>();
+        //field name:field definition/URI
+        private final Map<String, String> ldPathFields = new HashMap<String, String>();
+        //document field mappings
+        private final Map<String,String> documentFieldMapinngs = new HashMap<String, String>();
+        private final boolean keepAllMetadata;
 
+ 
         public SpecPacker(Specification os)
         {
-
             String serverURL = STANBOL_ENDPOINT;
             String stanbolChain = STANBOL_ENHANCEMENT_CHAIN;
-            String ldpath = null;
-
+            boolean keepAllMetadata = false;
+            
             for (int i = 0; i < os.getChildCount(); i++)
             {
                 SpecificationNode sn = os.getChild(i);
@@ -585,31 +885,57 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
                     stanbolChain = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
 
                 }
-                else if (sn.getType().equals(StanbolConfig.STANBOL_LDPATH))
-                {
-                    ldpath = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
-
-                }
                 // adding deref fields
                 else if (sn.getType().equals(StanbolConfig.NODE_FIELDMAP))
+                {
+                    String derefField = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                    dereferenceFields.add(derefField);
+
+                }
+                // adding ldpath prefixes
+                else if (sn.getType().equals(StanbolConfig.PREFIX_MAP))
                 {
                     String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
                     String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
                     if (target == null)
                     {
-                        // if destination field name is not given, the destination field name is the source field name
-                        // by default
                         target = source;
                     }
-                    dereferenceFields.put(source, target);
+                    ldPathPrefixes.put(source, target);
+                }
+                // adding ldpath fields
+                else if (sn.getType().equals(StanbolConfig.LDPATH_FIELD_MAP))
+                {
+                    String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                    String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
+                    if (target == null)
+                    {
+                        target = source;
+                    }
+                    ldPathFields.put(source, target);
+                }
 
+                // adding document field mappings
+                else if (sn.getType().equals(StanbolConfig.DOC_FIELD_MAP))
+                {
+                    String source = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_SOURCE);
+                    String target = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_TARGET);
+                    if (target == null)
+                    {
+                        target = source;
+                    }
+                    documentFieldMapinngs.put(source, target);
+                }
+                else if(sn.getType().equals(StanbolConfig.NODE_KEEPMETADATA)) 
+                {
+                    String value = sn.getAttributeValue(StanbolConfig.ATTRIBUTE_VALUE);
+                    keepAllMetadata = Boolean.parseBoolean(value);
                 }
 
             }
             this.stanbolServer = serverURL;
             this.stanbolChain = stanbolChain;
-            this.ldpath = ldpath;
-
+            this.keepAllMetadata = keepAllMetadata;
         }
 
         public String toPackedString()
@@ -617,34 +943,71 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             StringBuilder sb = new StringBuilder();
 
             int i;
-            // Mappings
-            final String[] sortArray = new String[dereferenceFields.size()];
+            packList(sb, dereferenceFields, '+');
+
+            final String[] prefixArray = new String[ldPathPrefixes.size()];
             i = 0;
-            for (String field : dereferenceFields.keySet())
+            for (String source : ldPathPrefixes.keySet()) 
             {
-                sortArray[i++] = field;
+              prefixArray[i++] = source;
             }
-            java.util.Arrays.sort(sortArray);
-
-            List<String> packedMappings = new ArrayList<String>();
-            String[] fixedList = new String[2];
-            for (String source : sortArray)
+            Arrays.sort(prefixArray);
+            
+            List<String> prefixMappings = new ArrayList<String>();
+            String[] prefixList = new String[2];
+            for (String source : prefixArray)
             {
-                String target = dereferenceFields.get(source);
+                String target = ldPathPrefixes.get(source);
                 StringBuilder localBuffer = new StringBuilder();
-                fixedList[0] = source;
-                fixedList[1] = target;
-                packFixedList(localBuffer, fixedList, ':');
-                packedMappings.add(localBuffer.toString());
+                prefixList[0] = source;
+                prefixList[1] = target;
+                packFixedList(localBuffer, prefixList, ':');
+                prefixMappings.add(localBuffer.toString());
             }
-            packList(sb, packedMappings, '+');
+            packList(sb, prefixMappings, '+');
 
-            if (ldpath != null)
+            final String[] ldpathFieldArray = new String[ldPathFields.size()];
+            i = 0;
+            for(String source : ldPathFields.keySet())
             {
-                sb.append('+');
-                sb.append(ldpath);
-
+                ldpathFieldArray[i++] = source;
             }
+            Arrays.sort(ldpathFieldArray);
+            
+            List<String> ldpathFieldMappings = new ArrayList<String>();
+            String[] ldpathFieldList = new String[2];
+            for (String source : ldpathFieldArray)
+            {
+                String target = ldPathFields.get(source);
+                StringBuilder localBuffer = new StringBuilder();
+                ldpathFieldList[0] = source;
+                ldpathFieldList[1] = target;
+                packFixedList(localBuffer, ldpathFieldList, ':');
+                ldpathFieldMappings.add(localBuffer.toString());
+            }
+            packList(sb, ldpathFieldMappings, '+');
+
+            //doc field mappings
+            final String[] docFieldArray = new String[documentFieldMapinngs.size()];
+            i = 0;
+            for(String source : documentFieldMapinngs.keySet())
+            {
+                docFieldArray[i++] = source;
+            }
+            Arrays.sort(docFieldArray);
+            List<String> docFieldMappings = new ArrayList<String>();            
+            String[] docFieldList = new String[2];
+            for (String source : docFieldArray)
+            {
+                String target = documentFieldMapinngs.get(source);
+                StringBuilder localBuffer = new StringBuilder();
+                docFieldList[0] = source;
+                docFieldList[1] = target;
+                packFixedList(localBuffer, docFieldList, ':');
+                docFieldMappings.add(localBuffer.toString());
+            }
+            packList(sb, docFieldMappings, '+');
+            
             if (stanbolServer != null)
             {
                 sb.append('+');
@@ -663,7 +1026,14 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             {
                 sb.append('-');
             }
-
+            if (keepAllMetadata)
+            {    
+                sb.append('+');
+            }    
+            else
+            {    
+                sb.append('-');
+            }    
             return sb.toString();
         }
 
@@ -677,16 +1047,31 @@ public class StanbolEnhancer extends org.apache.manifoldcf.agents.transformation
             return stanbolChain;
         }
 
-        public Map<String, String> getDereferenceFields()
+        public List<String> getDereferenceFields()
         {
             return dereferenceFields;
         }
 
-        public String getLDPath()
+        public Map<String,String> getLdPathPrefixes()
         {
-            return ldpath;
+            return ldPathPrefixes;
         }
 
-    }
+        public Map<String, String> getLdPathFields()
+        {
+            return ldPathFields;
+        }
 
-}
+        public Map<String,String> getDocumentFieldMapinngs()
+        {
+            return documentFieldMapinngs;
+        }
+
+        public boolean keepAllMetadata() 
+        {
+            return keepAllMetadata;
+        }
+          
+    }
+    
+} 
