@@ -85,4 +85,8 @@
 	</td>
 </tr>
 </table>
+#else
+<input type="hidden" name="primaryIndex" value="$Encoder.bodyEscape($PRIMARYINDEX)"/>
+<input type="hidden" name="entityIndex" value="$Encoder.bodyEscape($ENTITYINDEX)"/>
+<input type="hidden" name="entityTypeIndex" value="$Encoder.bodyEscape($ENTITYTYPEINDEX)"/>
 #end

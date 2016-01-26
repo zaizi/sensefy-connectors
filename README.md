@@ -18,7 +18,7 @@ In order to build the connectors, first need to download and build manifoldcf to
 ```
 git clone https://github.com/apache/manifoldcf.git
 cd manifoldcf/
-git checkout release-2.2-branch
+git checkout release-2.3-branch
 mvn clean install 
 ```
 
@@ -70,8 +70,8 @@ This builds the followings
 Add following connectors to **$MANIFOLD_INSTALL_DIR/connectors-lib**
 
 ```
-1. sensefy-connectors/output/mcf-solrwrapperconnector/target/mcf-solrwrapperprocessorconnector-connector-2.2.jar
-2. sensefy-connectors/transformation/mcf-stanbol-connector/target/mcf-stanbol-connector-2.2-jar-with-dependencies.jar
+1. sensefy-connectors/output/mcf-solrwrapperconnector/target/mcf-solrwrapperprocessorconnector-connector-2.3.jar
+2. sensefy-connectors/transformation/mcf-stanbol-connector/target/mcf-stanbol-connector-2.3-jar-with-dependencies.jar
 ```
 
 Add following properties to **$MANIFOLD_INSTALL_DIR/connectors.xml**
